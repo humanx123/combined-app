@@ -1314,3 +1314,6 @@ body { background: var(--app-bg); }
 .gesto-help { color: var(--faint); font-size: 12px; line-height: 1.5; }
 .gesto-help summary { cursor: pointer; color: var(--text); font-weight: 600; }
 .gesto-help p { margin: 6px 0 0; }
+.gesto-band { padding: 10px 10px 2px; border-radius: var(--radius-m); box-shadow: inset 0 0 0 1px var(--line-soft); }
+.gesto-band .gesto-settings { margin-top: 4px; }
+.gesto-rec-status svg { flex: none; }

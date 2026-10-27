@@ -26,6 +26,8 @@ export interface VoicingOptions {
 export interface Voicing {
   pitches: number[];
   bass: number | null;
+  /** Pitch class (0–11) of the degree's root: what a bass line plays, whatever the inversion. */
+  root: number;
   /** DAW-style name: "Am7", "F/A", "Bdim". */
   name: string;
   velocity: number;
@@ -56,7 +58,8 @@ export function voiceReading(r: ChordReading, o: VoicingOptions): Voicing {
   // Same note Gesture Synth's bass synth plays: two octaves under middle C, and it follows the thumb.
   const bass = o.bass ? clampMidi(36 + degree.intervals[0] + o.keyOffset - (r.octaveDown ? 12 : 0) + shift) : null;
   const { base, ext } = getChordParts(r.chordIndex, r.modeOverride, o.keyOffset, r.chordStyle, r.scaleMode);
-  return { pitches, bass, name: studioChordName(base, ext), velocity: velocityFor(r.volume) };
+  const root = (((degree.intervals[0] + o.keyOffset) % 12) + 12) % 12;
+  return { pitches, bass, root, name: studioChordName(base, ext), velocity: velocityFor(r.volume) };
 }
 
 /** Same notes, same chord: the monitor keeps ringing instead of re-attacking. */

@@ -8,9 +8,10 @@ import { useDaw, useTransport } from '../../state/store';
 import { useAgent } from '../../agent/agent';
 import {
   cameraVideo, isPlayable, latestFrame, newGestoTrack, setPreset, setTrack, startCamera, startKeyboard,
-  startRecording, stopInput, stopRecording, useGesto,
+  startRecording, stopInput, stopRecording, toggleJam, useGesto,
 } from '../../gesto/session';
-import { Square, LoaderCircle, Metronome, Piano, CircleAlert } from '../icons';
+import { BASS_STYLES, GROOVES, type BassStyle, type Groove } from '../../gesto/band';
+import { Square, LoaderCircle, Metronome, Piano, CircleAlert, Play, Drum } from '../icons';
 
 // Gesto mode: the third way to make music in the studio, next to the Producer's Agent and Ask.
 // Hands in front of the camera (or Gesture Synth's keys) play chords on a track; Record
@@ -102,9 +103,16 @@ function RecordBar() {
   const captured = useGesto((s) => s.captured);
   const agentRunning = useAgent((s) => s.running);
   const position = useTransport((s) => s.position);
+  const playing = useTransport((s) => s.playing);
+  const bandLive = useGesto((s) => s.bandLive);
   const project = useDaw((s) => s.project);
   return (
     <div className="gesto-rec">
+      {!recording && (
+        <button className="btn gesto-rec-btn" onClick={() => void toggleJam()} title={playing ? 'Stop the song' : 'Play the song and jam (nothing is recorded)'}>
+          {playing ? <><Square size={12} /> Stop</> : <><Play size={12} /> Jam</>}
+        </button>
+      )}
       {recording ? (
         <button className="btn gesto-rec-btn on" onClick={() => stopRecording()}><Square size={12} /> Stop and keep</button>
       ) : (
@@ -114,8 +122,53 @@ function RecordBar() {
         </button>
       )}
       <span className="gesto-rec-status" role="status">
-        {recording ? <><span className="rec-dot" /> {captured} chord{captured === 1 ? '' : 's'} · {formatPosition(project, position)}</> : 'Takes land as a MIDI clip you can edit.'}
+        {recording ? <><span className="rec-dot" /> {captured} chord{captured === 1 ? '' : 's'} · {formatPosition(project, position)}</>
+          : bandLive ? <><Drum size={13} /> Band playing</> : 'Takes land as MIDI clips you can edit.'}
       </span>
+    </div>
+  );
+}
+
+const BASS_PRESETS = PRESETS.filter((p) => p.family === 'bass');
+
+/** Live band: drums and a bass that follow the chord in your hands, recorded with the pads. */
+function BandSettings() {
+  const s = useGesto((x) => x.settings);
+  const set = useGesto((x) => x.setSettings);
+  const groove = GROOVES.find((g) => g.id === s.groove);
+  return (
+    <div className="gesto-band">
+      <label className="toggle">
+        <input type="checkbox" checked={s.band} onChange={(e) => set({ band: e.target.checked })} />
+        <span>Live band<small>Drums and a bass line that follow your chords in time with the song. Record live writes them as clips next to your pads.</small></span>
+      </label>
+      {s.band && (
+        <div className="gesto-settings">
+          <label className="field">
+            <span>Groove</span>
+            <select value={s.groove} onChange={(e) => set({ groove: e.target.value as Groove })}>
+              {GROOVES.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              <option value="off">No drums</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Bass</span>
+            <select value={s.bassStyle} onChange={(e) => set({ bassStyle: e.target.value as BassStyle })}>
+              {BASS_STYLES.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Bass sound</span>
+            <select value={s.bassPreset ?? ''} onChange={(e) => set({ bassPreset: e.target.value || null })}>
+              <option value="">{`Groove's own (${BASS_PRESETS.find((p) => p.id === groove?.bassPreset)?.name ?? 'bass'})`}</option>
+              {BASS_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <div className="gesto-toggles">
+            <label className="toggle"><input type="checkbox" checked={s.percussion} onChange={(e) => set({ percussion: e.target.checked })} /><span>Percussion</span></label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -210,12 +263,14 @@ export function GestoPanel({ hidden }: { hidden: boolean }) {
       </div>
       {error && <div className="err gesto-err"><CircleAlert size={14} /> {error}</div>}
       <RecordBar />
+      <BandSettings />
       <Settings />
       <details className="gesto-help">
         <summary>How to play</summary>
         <p><b>Left hand</b>: 1–5 fingers play degrees I–V; index + pinky is VI, add the thumb for VII. A fist mutes.</p>
         <p><b>Right hand</b>: finger count picks the chord style, height sets loudness (recorded as velocity), thumb out drops an octave.</p>
-        <p>Both hands must be in view to sound. Takes that would overlap a clip go to a new Gesto track with the same sound.</p>
+        <p>Both hands must be in view to sound. With the live band on, the bass follows the root of the chord you hold and changes with you.</p>
+        <p>While you record, the clips grow bar by bar (dimmed until you stop). Takes that would land on another clip go to a new Gesto track with the same sound. One undo removes the whole take.</p>
       </details>
     </div>
   );

@@ -8,7 +8,7 @@ const opts = { keyOffset: 0, octave: 0, bass: false };
 
 describe('Gesto voicing', () => {
   it('voices C major from Gesture Synth tables at C3', () => {
-    expect(voiceReading(reading(), opts)).toMatchObject({ pitches: [48, 52, 55], bass: null, name: 'C', velocity: 1 });
+    expect(voiceReading(reading(), opts)).toMatchObject({ pitches: [48, 52, 55], bass: null, root: 0, name: "C", velocity: 1 });
   });
 
   it('follows key, degree, minor table, style, octave and thumb', () => {

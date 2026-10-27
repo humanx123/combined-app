@@ -2,6 +2,7 @@ import * as Tone from 'tone';
 import { useDaw, useTransport, getProject } from '../state/store';
 import { useSettings } from '../state/settings';
 import { EngineGraph, preloadProject } from './graph';
+import { sameAudibleClips } from './clipChanges';
 import { contextLock } from './lock';
 import { configureFreeze, scheduleFreeze } from './freeze';
 import type { Project } from '../model/types';
@@ -131,7 +132,7 @@ function needsPlaybackHold(before: Project | null, after: Project): boolean {
   if (!before || before.bpm !== after.bpm || before.swing !== after.swing || before.timeSignature !== after.timeSignature || before.loop !== after.loop || before.master.effects !== after.master.effects || before.tracks.length !== after.tracks.length) return true;
   return after.tracks.some((t, i) => {
     const old = before.tracks[i];
-    return old.id !== t.id || old.kind !== t.kind || old.instrument !== t.instrument || old.drumLanes !== t.drumLanes || old.clips !== t.clips || old.effects !== t.effects;
+    return old.id !== t.id || old.kind !== t.kind || old.instrument !== t.instrument || old.drumLanes !== t.drumLanes || !sameAudibleClips(old.clips, t.clips) || old.effects !== t.effects;
   });
 }
 
@@ -251,6 +252,29 @@ export function liveNote(trackId: string, midi: number, durSec: number, velocity
 export function liveRelease(trackId: string) {
   bumpLive(trackId);
   graph?.liveRelease(trackId);
+}
+
+export async function prepareLive(trackIds: string[]) {
+  await ensureAudio();
+  await engineSettled();
+  await graph?.prepareLive(trackIds);
+}
+
+export function scheduleLive(trackId: string, beat: number, pitch: number, durBeats: number, velocity: number): boolean {
+  return graph?.scheduleLive(trackId, beat, pitch, durBeats, velocity) ?? false;
+}
+
+export function scheduleLiveRelease(trackId: string, beat: number) {
+  graph?.scheduleLiveRelease(trackId, beat);
+}
+
+export function clearLive() {
+  graph?.clearLive();
+}
+
+/** Seconds the engine looks ahead: live events closer than this to the playhead would be missed. */
+export function lookAheadSeconds(): number {
+  return realtimeContext?.lookAhead ?? 0.12;
 }
 
 /** Song position right now in beats: exact while playing, unlike the 60 fps playhead. */

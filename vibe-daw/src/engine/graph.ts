@@ -7,6 +7,7 @@ import { frozenFor, type Frozen } from './freeze';
 import { createEffect, structuralParams, type EffectUnit } from './effects';
 import { createInstrument, prepareInstrument, type Instrument, type InstrumentAssets } from './instruments';
 import { trackTail } from './renderPlan';
+import { sameAudibleClips } from './clipChanges';
 
 // EngineGraph turns a Project into a live Tone.js graph and schedules it on a
 // transport. The same class drives realtime playback and offline bounces, which is
@@ -260,7 +261,10 @@ export class EngineGraph {
         s.channel.pan.value = track.pan;
       }
       s.channel.mute = !audibleOf(track);
-      const needsSchedule = frozenChanged || globalChanged || s.scheduledClips !== track.clips || s.scheduledLanes !== track.drumLanes || prev === null;
+      // Edits that only touch muted clips (Gesto's live recording) leave the scheduled notes alone.
+      const clipsChanged = s.scheduledClips !== track.clips && !sameAudibleClips(s.scheduledClips, track.clips);
+      if (!clipsChanged) s.scheduledClips = track.clips;
+      const needsSchedule = frozenChanged || globalChanged || clipsChanged || s.scheduledLanes !== track.drumLanes || prev === null;
       s.track = track;
       if (needsSchedule) {
         await this.scheduleTrack(s);
@@ -720,6 +724,65 @@ export class EngineGraph {
     const now = this.context.now() + 0.01;
     this.openLiveGate(s, now);
     inst.trigger(midi, durSec, now, velocity);
+  }
+
+  // Gesto's live band: drum hits and bass notes placed on the transport a little ahead of the
+  // playhead, so they land on the grid exactly. scheduleOnce (not `once`): a looping song
+  // must not replay last pass's hits on top of the new ones.
+  private liveEvents: number[] = [];
+
+  /** Load the monitor voices the live band will use, after the tracks' strips exist. */
+  async prepareLive(trackIds: string[]) {
+    for (const id of trackIds) {
+      const s = this.strips.get(id);
+      if (s) await this.monitorFor(s);
+    }
+  }
+
+  /** One live note at a song beat: a drum lane hit, or a note on the track's monitor voice. */
+  scheduleLive(trackId: string, beat: number, pitch: number, durBeats: number, velocity: number): boolean {
+    const s = this.strips.get(trackId);
+    if (!s || !this.project) return false;
+    const at = this.ticks(beat + this.swingOffset(beat));
+    let id: number;
+    if (s.track.kind === 'drums') {
+      const lane = s.track.drumLanes?.find((l) => l.note === pitch);
+      if (!lane) return false;
+      id = this.transport.scheduleOnce((time) => {
+        try {
+          this.triggerDrum(s, lane, time, velocity);
+          for (const d of this.duckTargets(trackId)) d.duck!(time);
+        } catch (e) { console.warn('Live drum hit failed', e); }
+      }, at);
+    } else {
+      const m = this.monitors.get(trackId);
+      if (!m) return false;
+      const durSec = beatsToSeconds(this.project, Math.max(0.01, durBeats));
+      id = this.transport.scheduleOnce((time) => {
+        try {
+          m.inst.trigger(pitch, durSec, time, velocity);
+          for (const d of this.duckTargets(trackId)) d.duck!(time);
+        } catch (e) { console.warn('Live note failed', e); }
+      }, at);
+    }
+    this.liveEvents.push(id);
+    if (this.liveEvents.length > 2048) this.liveEvents.splice(0, 1024); // fired long ago
+    return true;
+  }
+
+  /** Cut a track's monitor at a song beat (the bass following a chord change). */
+  scheduleLiveRelease(trackId: string, beat: number) {
+    const m = this.monitors.get(trackId);
+    if (!m) return;
+    this.liveEvents.push(this.transport.scheduleOnce((time) => m.inst.releaseAll(time), this.ticks(beat + this.swingOffset(beat))));
+  }
+
+  /** Drop every live event not yet played and silence the monitors. */
+  clearLive() {
+    for (const id of this.liveEvents) this.transport.clear(id);
+    this.liveEvents = [];
+    const now = this.context.now();
+    for (const m of this.monitors.values()) m.inst.releaseAll(now);
   }
 
   /** Let go of everything played by hand on a track. */

@@ -86,6 +86,28 @@ export function liveRelease(trackId: string) {
   else if (loading) void loading.then((m) => m.liveRelease(trackId));
 }
 
+/** Gesto live band: load the monitor voices of these tracks (after they exist in the graph). */
+export async function prepareLive(trackIds: string[]) {
+  await (await loadEngine()).prepareLive(trackIds);
+}
+
+/** Gesto live band: one note/hit at a song beat, on the transport clock. False if it couldn't be placed. */
+export function scheduleLive(trackId: string, beat: number, pitch: number, durBeats: number, velocity: number): boolean {
+  return engine?.scheduleLive(trackId, beat, pitch, durBeats, velocity) ?? false;
+}
+
+export function scheduleLiveRelease(trackId: string, beat: number) {
+  engine?.scheduleLiveRelease(trackId, beat);
+}
+
+export function clearLive() {
+  engine?.clearLive();
+}
+
+export function lookAheadSeconds(): number {
+  return engine?.lookAheadSeconds() ?? 0.12;
+}
+
 /** Exact song position in beats (the transport store's playhead updates at 60 fps). */
 export function currentBeat(): number {
   return engine?.currentBeat() ?? useTransport.getState().position;

@@ -1283,3 +1283,34 @@ body { background: var(--app-bg); }
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px));
   --safe-left: max(env(safe-area-inset-left, 0px), var(--native-safe-left, 0px));
 }
+
+/* ---------------------------------------------------------------- Gesto mode (Producer panel) */
+.agent-chat { display: contents; }
+.agent-chat[hidden], .gesto[hidden] { display: none; }
+.gesto { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.gesto-stage { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-m); overflow: hidden; background: var(--bg); border: 1px solid var(--line-soft); flex: none; }
+.gesto-video, .gesto-overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.gesto-video { display: none; }
+.gesto-stage.live .gesto-video { display: block; }
+.gesto-stage-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; color: var(--faint); font-size: 12.5px; line-height: 1.5; }
+.gesto-chord { position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: var(--radius-m); background: rgba(5, 5, 5, 0.72); backdrop-filter: blur(8px); min-width: 84px; }
+.gesto-chord b { font-size: 26px; line-height: 1; font-weight: 700; color: var(--faint); }
+.gesto-chord.on b { background: var(--agent-fill); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gesto-meter { display: block; height: 3px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.gesto-meter span { display: block; height: 100%; background: var(--agent-fill); transition: width 0.08s linear; }
+.gesto-inputs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gesto-inputs .btn { justify-content: center; }
+.gesto-err { display: flex; gap: 6px; align-items: flex-start; }
+.gesto-rec { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-m); background: var(--raised); }
+.gesto-rec-btn { gap: 8px; font-weight: 600; background: var(--panel); }
+.gesto-rec-btn.on { color: var(--rec); }
+.gesto-rec-status { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; min-width: 0; }
+.gesto-settings { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+.gesto-settings .field { margin-bottom: 10px; min-width: 0; }
+.gesto-settings .field.wide { grid-column: 1 / -1; }
+.gesto-settings select { width: 100%; min-width: 0; }
+.gesto-toggles { grid-column: 1 / -1; display: flex; gap: 18px; flex-wrap: wrap; }
+.gesto-toggles .toggle span { display: inline-flex; align-items: center; gap: 5px; }
+.gesto-help { color: var(--faint); font-size: 12px; line-height: 1.5; }
+.gesto-help summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.gesto-help p { margin: 6px 0 0; }

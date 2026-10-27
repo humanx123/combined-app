@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -21,7 +22,9 @@ function serviceWorker(): Plugin {
 
 export default defineConfig({
   plugins: [react(), serviceWorker()],
-  server: { port: 5173 },
+  // Gesto Studio: the studio's Gesto mode reuses Gesture Synth's own hand tracking and chords.
+  resolve: { alias: { '@gesto': fileURLToPath(new URL('../gesture-synth/src', import.meta.url)) } },
+  server: { port: 5173, fs: { allow: ['..'] } },
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 2000,

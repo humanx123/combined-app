@@ -38,7 +38,7 @@ export function App() {
   const narrow = useMediaQuery(NARROW);
   const [browserOpen, setBrowserOpen] = useState(() => !matchesMedia(NARROW));
   // A request handed over from Gesture Synth (gesto:pedido, read by AgentPanel) opens the agent even on phones.
-  const [agentOpen, setAgentOpen] = useState(() => !matchesMedia(NARROW) || hasGestoRequest());
+  const [agentOpen, setAgentOpen] = useState(() => !matchesMedia(NARROW) || hasGestoRequest() || window.location.hash === '#gesto');
   const [focusAgent, setFocusAgent] = useState(0);
 
   // Only one drawer at a time; on wide screens both columns can stay open.

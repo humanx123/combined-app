@@ -231,6 +231,36 @@ export function previewNote(trackId: string, midi: number, velocity = 0.8) {
   void ensureAudio().then(engineSettled).then(() => graph?.previewNote(trackId, midi, velocity)).catch((e) => console.warn('Preview failed', e));
 }
 
+// Gesto Studio: chords played by hand. A request number per track keeps a slow first load
+// (instrument samples) from sounding a chord the player already let go of.
+const liveRequests = new Map<string, number>();
+const bumpLive = (trackId: string) => { const n = (liveRequests.get(trackId) ?? 0) + 1; liveRequests.set(trackId, n); return n; };
+
+export function liveChord(trackId: string, midis: number[], velocity: number) {
+  const n = bumpLive(trackId);
+  const wanted = () => liveRequests.get(trackId) === n;
+  void ensureAudio().then(engineSettled).then(() => (wanted() ? graph?.liveChord(trackId, midis, velocity, wanted) : undefined)).catch((e) => console.warn('Live chord failed', e));
+}
+
+export function liveNote(trackId: string, midi: number, durSec: number, velocity: number) {
+  const n = liveRequests.get(trackId) ?? 0;
+  const wanted = () => (liveRequests.get(trackId) ?? 0) === n;
+  void ensureAudio().then(engineSettled).then(() => (wanted() ? graph?.liveNote(trackId, midi, durSec, velocity, wanted) : undefined)).catch((e) => console.warn('Live note failed', e));
+}
+
+export function liveRelease(trackId: string) {
+  bumpLive(trackId);
+  graph?.liveRelease(trackId);
+}
+
+/** Song position right now in beats: exact while playing, unlike the 60 fps playhead. */
+export function currentBeat(): number {
+  if (transport && realtimeContext && useTransport.getState().playing && transport.state === 'started') {
+    return transport.getTicksAtTime(realtimeContext.immediate()) / transport.PPQ;
+  }
+  return useTransport.getState().position;
+}
+
 /** Audition a library sample through the master bus. */
 export async function previewSample(sampleId: string) {
   stopPreview();

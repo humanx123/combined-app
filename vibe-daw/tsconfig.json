@@ -20,7 +20,10 @@
     "noEmit": true,
     "types": [
       "vite/client"
-    ]
+    ],
+    "paths": {
+      "@gesto/*": ["../gesture-synth/src/*"]
+    }
   },
   "include": [
     "src"

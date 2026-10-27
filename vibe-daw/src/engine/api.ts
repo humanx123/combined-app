@@ -69,6 +69,28 @@ export function previewNote(trackId: string, midi: number, velocity = 0.8) {
   void loadEngine().then((m) => m.previewNote(trackId, midi, velocity));
 }
 
+/** Gesto: hold a chord on a track until the next liveChord or liveRelease. */
+export function liveChord(trackId: string, midis: number[], velocity = 0.8) {
+  unlockAudio();
+  void loadEngine().then((m) => m.liveChord(trackId, midis, velocity));
+}
+
+/** Gesto: one short note next to the held chord (arpeggiator steps). */
+export function liveNote(trackId: string, midi: number, durSec: number, velocity = 0.8) {
+  void loadEngine().then((m) => m.liveNote(trackId, midi, durSec, velocity));
+}
+
+export function liveRelease(trackId: string) {
+  // Queued behind any chord still waiting for the engine, so it can't outlive the release.
+  if (engine) engine.liveRelease(trackId);
+  else if (loading) void loading.then((m) => m.liveRelease(trackId));
+}
+
+/** Exact song position in beats (the transport store's playhead updates at 60 fps). */
+export function currentBeat(): number {
+  return engine?.currentBeat() ?? useTransport.getState().position;
+}
+
 export async function previewSample(sampleId: string) {
   unlockAudio();
   await (await loadEngine()).previewSample(sampleId);

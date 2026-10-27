@@ -97,6 +97,9 @@ export async function preloadProject(p: Project): Promise<Map<string, Instrument
   return assets;
 }
 
+/** A hand-played chord rings until it is released or replaced; this only bounds a forgotten one. */
+const LIVE_HOLD_SEC = 300;
+
 export class EngineGraph {
   readonly transport: ReturnType<typeof Tone.getTransport>;
   readonly context: Tone.BaseContext;
@@ -657,6 +660,78 @@ export class EngineGraph {
     }
   }
 
+  // Gesto Studio plays pads by hand. Each track gets a second, monitor-only instance of its
+  // instrument on the same input and effects, so letting go of a held chord never cuts the
+  // song's own notes on that track.
+  private monitors = new Map<string, { key: string; params: Record<string, number>; inst: Instrument }>();
+  private monitorLoads = new Map<string, Promise<Instrument | null>>();
+
+  private async monitorFor(s: Strip): Promise<Instrument | null> {
+    const spec = s.track.instrument;
+    if (s.track.kind !== 'instrument' || !spec) return null;
+    const ready = this.monitors.get(s.id);
+    if (ready && ready.key === s.instKey) {
+      if (ready.params !== spec.params) { ready.inst.setParams(spec.params); ready.params = spec.params; }
+      return ready.inst;
+    }
+    const loading = this.monitorLoads.get(s.id);
+    if (loading) return loading;
+    const key = s.instKey;
+    const load = (async () => {
+      const assets = await prepareInstrument(spec);
+      if (this.disposed || this.strips.get(s.id) !== s) return null;
+      const old = this.monitors.get(s.id);
+      old?.inst.releaseAll();
+      old?.inst.dispose();
+      const inst = createInstrument(spec, assets);
+      inst.output.connect(s.input);
+      this.monitors.set(s.id, { key, params: spec.params, inst });
+      return inst;
+    })().finally(() => this.monitorLoads.delete(s.id));
+    this.monitorLoads.set(s.id, load);
+    return load;
+  }
+
+  /** Frozen tracks mute their live chain; open it while a hand-played chord sounds. */
+  private openLiveGate(s: Strip, now: number) {
+    if (!s.frozen) return;
+    s.liveGate.gain.cancelScheduledValues(now);
+    s.liveGate.gain.setValueAtTime(1, now);
+  }
+
+  /** Hold a chord on a track until the next liveChord or liveRelease. `wanted` re-checks after loading. */
+  async liveChord(trackId: string, midis: number[], velocity: number, wanted: () => boolean = () => true) {
+    const s = this.strips.get(trackId);
+    if (!s) return;
+    const inst = await this.monitorFor(s);
+    if (!inst || !wanted()) return;
+    const now = this.context.now() + 0.01;
+    inst.releaseAll(now);
+    this.openLiveGate(s, now);
+    for (const m of midis) inst.trigger(m, LIVE_HOLD_SEC, now, velocity);
+  }
+
+  /** One short note on the monitor, next to whatever is held (arpeggiator steps). */
+  async liveNote(trackId: string, midi: number, durSec: number, velocity: number, wanted: () => boolean = () => true) {
+    const s = this.strips.get(trackId);
+    if (!s) return;
+    const inst = await this.monitorFor(s);
+    if (!inst || !wanted()) return;
+    const now = this.context.now() + 0.01;
+    this.openLiveGate(s, now);
+    inst.trigger(midi, durSec, now, velocity);
+  }
+
+  /** Let go of everything played by hand on a track. */
+  liveRelease(trackId: string) {
+    const s = this.strips.get(trackId);
+    const m = this.monitors.get(trackId);
+    if (!s || !m) return;
+    const now = this.context.now();
+    m.inst.releaseAll(now);
+    if (s.frozen) s.liveGate.gain.setValueAtTime(0, now + trackTail(s.track, this.project!.bpm));
+  }
+
   trackLevel(trackId: string): number {
     const m = this.strips.get(trackId)?.meter;
     if (!m) return -Infinity;
@@ -683,6 +758,10 @@ export class EngineGraph {
     s.chokes.clear();
     s.instrument?.releaseAll();
     s.instrument?.dispose();
+    const monitor = this.monitors.get(s.id);
+    monitor?.inst.releaseAll();
+    monitor?.inst.dispose();
+    this.monitors.delete(s.id);
     s.fx.forEach((f) => f.unit.dispose());
     s.input.dispose();
     s.channel.dispose();

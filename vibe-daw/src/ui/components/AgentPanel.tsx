@@ -1,3 +1,4 @@
+import { GestoPanel } from './GestoPanel';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUp, Square, Ear, Plus, Play, Check, RotateCcw, Paperclip, X, Brain, ListChecks, Eye, Mic, LoaderCircle, Pause, Shuffle, AtSign, Wrench,
@@ -132,6 +133,9 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
   const context = useAgent((s) => s.context);
   const model = useSettings((s) => s.model);
   const [text, setText] = useState('');
+  // Third mode next to Agent and Ask: Gesto plays and records chords by hand. Opened with /studio#gesto.
+  const [view, setView] = useState<'chat' | 'gesto'>(() => (window.location.hash === '#gesto' ? 'gesto' : 'chat'));
+  const [gestoUsed, setGestoUsed] = useState(view === 'gesto');
   // Gesto Studio: a progression played by hand in Gesture Synth (/gesto/) arrives as a ready-made request.
   useEffect(() => {
     try {
@@ -256,13 +260,16 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
       <div className="agent-head">
         <div className="agent-title">Producer</div>
         <div className="seg" role="radiogroup" aria-label="Agent mode">
-          <button className={mode === 'agent' ? 'on' : ''} disabled={running} onClick={() => useAgent.getState().setMode('agent')} role="radio" aria-checked={mode === 'agent'} title="The agent edits your project">Agent</button>
-          <button className={mode === 'ask' ? 'on' : ''} disabled={running} onClick={() => useAgent.getState().setMode('ask')} role="radio" aria-checked={mode === 'ask'} title="Read-only: questions and feedback">Ask</button>
+          <button className={view === 'chat' && mode === 'agent' ? 'on' : ''} disabled={running && view === 'chat'} onClick={() => { setView('chat'); useAgent.getState().setMode('agent'); }} role="radio" aria-checked={view === 'chat' && mode === 'agent'} title="The agent edits your project">Agent</button>
+          <button className={view === 'chat' && mode === 'ask' ? 'on' : ''} disabled={running && view === 'chat'} onClick={() => { setView('chat'); useAgent.getState().setMode('ask'); }} role="radio" aria-checked={view === 'chat' && mode === 'ask'} title="Read-only: questions and feedback">Ask</button>
+          <button className={view === 'gesto' ? 'on' : ''} onClick={() => { setView('gesto'); setGestoUsed(true); }} role="radio" aria-checked={view === 'gesto'} title="Play and record chords with your hands">Gesto</button>
         </div>
-        <button className="btn icon" title="New chat" disabled={running} onClick={() => { useAgent.getState().clear(); useChatReferences.setState({ pending: [] }); setText(''); setAttachments([]); setRecentReferences([]); discardDraft(); }}><Plus size={15} /></button>
+        <button className="btn icon" hidden={view === 'gesto'} title="New chat" disabled={running} onClick={() => { useAgent.getState().clear(); useChatReferences.setState({ pending: [] }); setText(''); setAttachments([]); setRecentReferences([]); discardDraft(); }}><Plus size={15} /></button>
         <button className="btn icon drawer-close" onClick={onClose} aria-label="Close Producer panel"><X size={16} /></button>
       </div>
 
+      {gestoUsed && <GestoPanel hidden={view !== 'gesto'} />}
+      <div className="agent-chat" hidden={view === 'gesto'}>
       {latestPlan && <Plan key={latestPlan.id} item={latestPlan} pinned />}
 
       <div className="feed" ref={feedRef} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>
@@ -363,6 +370,7 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
           {context.compactions > 0 && <span title="Older exchanges are summarized automatically. The agent can also manage its own working memory.">Memory compacted {context.compactions}×</span>}
           {tokens.input + tokens.output > 0 && <span>{Math.round((tokens.input + tokens.output) / 1000)}k tokens</span>}
         </div>
+      </div>
       </div>
     </aside>
   );

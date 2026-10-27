@@ -31,7 +31,7 @@ a { color: inherit; }
 .hero h1 { font: 700 clamp(34px, 7vw, 64px)/1.02 'Space Grotesk', sans-serif; letter-spacing: -.035em; margin: 0 0 16px; }
 .hero h1 span { background: linear-gradient(90deg, #c4b5fd, var(--pink) 60%, #fda4af); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero p { color: var(--muted); max-width: 560px; margin: 0; font-size: 17px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .card {
   position: relative; display: flex; flex-direction: column; gap: 8px; padding: 24px; min-height: 230px;
   border-radius: var(--radius); border: 1px solid var(--line); background: var(--card);
@@ -41,6 +41,7 @@ a { color: inherit; }
 .card::after { content: ''; position: absolute; inset: auto -30% -60% auto; width: 260px; height: 260px; border-radius: 50%; filter: blur(40px); opacity: .55; }
 .card.gesto::after { background: var(--violet); }
 .card.estudio::after { background: var(--pink); }
+.card.mezcla::after { background: var(--cyan); }
 .card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.22); }
 .card:focus-visible, button:focus-visible, input:focus-visible, .ghost:focus-visible { outline: 2px solid #f9a8d4; outline-offset: 3px; }
 .card h2 { font: 700 28px/1 'Space Grotesk', sans-serif; margin: 6px 0 0; letter-spacing: -.02em; }

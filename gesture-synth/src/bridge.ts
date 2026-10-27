@@ -84,7 +84,7 @@ function sendToStudio() {
 export function mountStudioButton() {
   const style = document.createElement('style');
   style.textContent = `
-    .gesto-pill{position:fixed;top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:80;display:flex;gap:6px;font:500 13px/1 Inter,system-ui,sans-serif}
+    .gesto-pill{position:fixed;top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:80;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100vw - 96px);font:500 13px/1 Inter,system-ui,sans-serif}
     .gesto-pill a,.gesto-pill button{all:unset;cursor:pointer;padding:9px 12px;border-radius:999px;color:#f4f1ff;background:rgba(14,12,30,.72);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
     .gesto-pill button{background:linear-gradient(135deg,#7c3aed,#ec4899);border-color:transparent;max-width:56vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .gesto-pill a:focus-visible,.gesto-pill button:focus-visible{outline:2px solid #f9a8d4;outline-offset:2px}
@@ -99,11 +99,16 @@ export function mountStudioButton() {
   home.textContent = '⌂';
   home.title = 'Volver al inicio de Gesto Studio';
   home.setAttribute('aria-label', 'Inicio de Gesto Studio');
+  // Gesto mode inside the studio: play pads by hand and record them as clips.
+  const live = document.createElement('a');
+  live.href = '/studio/#gesto';
+  live.textContent = '🎛️ Tocar en el estudio';
+  live.title = 'Abrir el estudio en modo Gesto: tocar pads con las manos y grabarlos en vivo';
   const studio = document.createElement('button');
   studio.type = 'button';
   studio.title = 'Abrir el estudio y pedirle al agente una canción con estos acordes';
   studio.addEventListener('click', sendToStudio);
-  pill.append(home, studio);
+  pill.append(home, live, studio);
   document.body.appendChild(pill);
 
   const render = (p: Progression | null) => {

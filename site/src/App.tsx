@@ -94,7 +94,7 @@ function Hero() {
 
 const STEPS = [
   { icon: Hand, title: 'Toca', text: 'La mano izquierda elige el grado del acorde y si es mayor o menor; la derecha, el volumen, el tono y la octava. Sin cámara, también con el teclado.' },
-  { icon: ArrowRight, title: 'Llévalo al estudio', text: 'Gesto recuerda los acordes que mantienes. Un toque en «Al estudio» y el productor recibe tu progresión como pedido.' },
+  { icon: ArrowRight, title: 'Llévalo al estudio', text: 'Toca pads con las manos dentro del estudio y grábalos en vivo como clips MIDI, o manda tu progresión al productor como pedido.' },
   { icon: Wand2, title: 'El productor la arma', text: 'Crea pistas, escribe notas, mezcla y te muestra cada cambio para que lo conserves o lo deshagas. Todo queda editable a mano.' },
 ];
 

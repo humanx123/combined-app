@@ -9,14 +9,23 @@ import { modelSourceLabel, trackModelLoad } from './analytics';
 // public MediaPipe locations (jsDelivr for the wasm, Google for the model).
 // Browsers cache these files for 1 year (immutable, via public/_headers), so a
 // version bump MUST change this path — see CLAUDE.md.
-const BASE = import.meta.env.BASE_URL;
-const MODEL_SOURCES = [
-  { wasm: `${BASE}v1.0.1/wasm`, task: `${BASE}v1.0.1/hand_landmarker.task` },
-  {
-    wasm: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm',
-    task: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-  },
-] as const;
+let modelBase = import.meta.env.BASE_URL;
+
+/** Hosts that embed the tracker elsewhere (Gesto inside Vibe's studio) point it at the instrument's folder. */
+export function setModelBase(path: string) {
+  modelBase = path.endsWith('/') ? path : `${path}/`;
+}
+
+function modelSources() {
+  return [
+    { wasm: `${modelBase}v1.0.1/wasm`, task: `${modelBase}v1.0.1/hand_landmarker.task` },
+    {
+      wasm: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm',
+      task: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+    },
+  ];
+}
+type ModelSource = ReturnType<typeof modelSources>[number];
 
 /**
  * Pick the download source. CF is deterministic-priority, never raced against
@@ -26,8 +35,9 @@ const MODEL_SOURCES = [
  * whenever reachable; same-origin Vercel is the fallback for CF-unreachable
  * users (e.g. mainland China ISPs with flaky CF paths).
  */
-async function pickSource(): Promise<(typeof MODEL_SOURCES)[number]> {
-  const cf = MODEL_SOURCES[0];
+async function pickSource(): Promise<ModelSource> {
+  const sources = modelSources();
+  const cf = sources[0];
   try {
     const res = await fetch(cf.task, {
       method: 'HEAD',
@@ -38,7 +48,7 @@ async function pickSource(): Promise<(typeof MODEL_SOURCES)[number]> {
   } catch {
     // Our origin unreachable — fall back to the official public sources.
   }
-  return MODEL_SOURCES[1];
+  return sources[1];
 }
 
 let handLandmarker: HandLandmarker | null = null;
@@ -66,7 +76,7 @@ export function initHandTracking(): Promise<HandLandmarker> {
  * nothing; the click path (initHandTracking) still has the Vercel fallback.
  */
 export async function prefetchModel(): Promise<void> {
-  const cf = MODEL_SOURCES[0];
+  const cf = modelSources()[0];
   try {
     const res = await fetch(cf.task, {
       method: 'HEAD',
@@ -87,9 +97,10 @@ async function doInit(): Promise<HandLandmarker> {
     lastError = e;
     return null;
   });
+  const sources = modelSources();
   const attemptSources = order
-    ? [order, ...MODEL_SOURCES.filter((s) => s !== order)]
-    : [...MODEL_SOURCES];
+    ? [order, ...sources.filter((s) => s.task !== order.task)]
+    : sources;
   const startTime = performance.now();
   // Lazy-load the tasks-vision runtime: it's ~120 KB of JS that only the
   // camera path needs, so it stays out of the initial bundle (LCP). The

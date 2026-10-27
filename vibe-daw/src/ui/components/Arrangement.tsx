@@ -293,6 +293,7 @@ function KeySetup() {
       </form>
       {error && <div className="err" style={{ marginTop: 10 }}>{error}</div>}
       <div className="hero-foot">Your key is saved in this browser (and in your own account if you sign in to sync) and sent only to Google.</div>
+      <div className="hero-foot">Prefer Groq’s open models? Pick Groq under Settings → AI and paste a key from <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>.</div>
     </>
   );
 }
@@ -300,7 +301,7 @@ function KeySetup() {
 /** Shown only until the user connects a Gemini key; after that the empty arrangement stays clear. */
 function EmptyHero() {
   const [dismissed, setDismissed] = useState(readDismissed);
-  useSettings((s) => s.apiKey + s.connection); // re-render when a key is added
+  useSettings((s) => s.apiKey + s.connection + s.provider + s.groqKey); // re-render when a key is added
   const close = () => {
     setDismissed(true);
     try { localStorage.setItem(HERO_DISMISSED, '1'); } catch { /* storage disabled */ }

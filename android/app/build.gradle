@@ -1,0 +1,29 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.gesto.studio'
+    compileSdk 34
+    buildToolsVersion '34.0.0'
+    defaultConfig {
+        applicationId 'com.gesto.studio'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+        // The site this shell opens. Override with -PsitioGesto=https://… for your own deploy.
+        buildConfigField 'String', 'SITIO', "\"${project.findProperty('sitioGesto') ?: 'https://gesto-studio.unhumanx.workers.dev'}\""
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        // ./gradlew assembleRelease -PfirmaLocal signs with this machine's debug key.
+        release { if (project.hasProperty('firmaLocal')) signingConfig signingConfigs.debug }
+    }
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

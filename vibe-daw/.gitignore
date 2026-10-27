@@ -1,0 +1,33 @@
+**/node_modules/
+dist
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.firebase
+coverage
+*.tsbuildinfo
+.firebaserc
+
+playwright-report/
+test-results/
+gha-creds-*.json
+*-debug.log
+/.qa/
+dist-prerender
+
+# Native iOS package and account backend have separate dependency trees.
+**/node_modules/
+mobile/ios/
+mobile/android/
+mobile/.expo/
+mobile/dist/
+
+mobile/credentials.json
+**/*.p8
+**/*.p12
+**/*.mobileprovision
+
+# App Store screenshot pipeline output (scripts/screenshots/)
+/screenshots

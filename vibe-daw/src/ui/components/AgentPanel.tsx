@@ -132,6 +132,16 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
   const context = useAgent((s) => s.context);
   const model = useSettings((s) => s.model);
   const [text, setText] = useState('');
+  // Gesto Studio: a progression played by hand in Gesture Synth (/gesto/) arrives as a ready-made request.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('gesto:pedido');
+      if (!raw) return;
+      localStorage.removeItem('gesto:pedido');
+      const pedido = JSON.parse(raw) as { texto?: string; creado?: number };
+      if (pedido.texto && Date.now() - (pedido.creado ?? 0) < 15 * 60_000) setText(pedido.texto);
+    } catch { /* storage disabled or malformed */ }
+  }, []);
   const [suggestions, setSuggestions] = useState(() => shuffledSuggestions('song'));
   useEffect(() => { setSuggestions(shuffledSuggestions(mode === 'ask' ? 'ask' : 'song')); }, [mode]);
   const project = useDaw((s) => s.project);

@@ -15,6 +15,13 @@ import { prepareListeningAudio } from './listeningAudio';
 
 const MAX_LISTEN_SECONDS = 60;
 
+/** Only Gemini hears audio. On Groq the tools fail loudly instead of inventing what they "heard". */
+function requireEars() {
+  if (useSettings.getState().provider === 'groq') {
+    throw new Error('Listening needs Gemini: Groq models cannot hear audio. Switch the AI provider to Gemini in Settings to use the ears.');
+  }
+}
+
 const concise = (text: string, chars: number) => text.length <= chars ? text : text.slice(0, chars) + '…';
 const listenCache = new WeakMap<Project, Map<string, ListenResult>>();
 
@@ -46,6 +53,7 @@ export interface ListenResult {
 
 export async function listen(req: ListenRequest): Promise<ListenResult> {
   req.signal?.throwIfAborted();
+  requireEars();
   const p = req.project;
   const bpb = beatsPerBar(p);
   const lastBar = Math.ceil(projectLength(p) / bpb) + 1;
@@ -108,6 +116,7 @@ Be literal about what you hear. No preamble.`;
 
 export async function audition(sampleId: string, question?: string, signal?: AbortSignal): Promise<{ heard: string }> {
   signal?.throwIfAborted();
+  requireEars();
   const meta = getSampleMeta(sampleId);
   if (!meta) throw new Error(`No sample with id ${sampleId}`);
   const buf = await loadBuffer(sampleId);
@@ -149,6 +158,7 @@ export async function audition(sampleId: string, question?: string, signal?: Abo
 /** Listen to arbitrary user-provided audio (a reference track) and extract a production brief. */
 export async function analyzeReference(data: ArrayBuffer, name: string, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
+  requireEars();
   const buf = await decodeAudio(data);
   signal?.throwIfAborted();
   const pcm = audioBufferToPcm(buf, 60);

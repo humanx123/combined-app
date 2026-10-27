@@ -37,7 +37,8 @@ export function App() {
   // On narrow screens the side panels are drawers over the timeline, so they start closed.
   const narrow = useMediaQuery(NARROW);
   const [browserOpen, setBrowserOpen] = useState(() => !matchesMedia(NARROW));
-  const [agentOpen, setAgentOpen] = useState(() => !matchesMedia(NARROW));
+  // A request handed over from Gesture Synth (gesto:pedido, read by AgentPanel) opens the agent even on phones.
+  const [agentOpen, setAgentOpen] = useState(() => !matchesMedia(NARROW) || hasGestoRequest());
   const [focusAgent, setFocusAgent] = useState(0);
 
   // Only one drawer at a time; on wide screens both columns can stay open.
@@ -126,4 +127,8 @@ export function App() {
       <ConsentDialog />
     </div>
   );
+}
+
+function hasGestoRequest(): boolean {
+  try { return !!localStorage.getItem('gesto:pedido'); } catch { return false; }
 }

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.local
+CLAUDE.local.md
+.DS_Store
+.env
+.env.*
+!.env.example
+docs/
+.vercel
+
+# GA4/GSC OAuth secrets (docs/ga4/) — never commit
+docs/ga4/client.json
+docs/ga4/token.json
+docs/ga4/property.json
+docs/ga4/auth.log

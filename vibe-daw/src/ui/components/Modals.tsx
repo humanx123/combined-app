@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Trash, Plus, Copy, Cloud, LogOut, RotateCcw } from '../icons';
-import { useSettings, MODELS, MAX_CUSTOM_INSTRUCTIONS, type Thinking } from '../../state/settings';
+import { useSettings, MODELS, MAX_CUSTOM_INSTRUCTIONS, type Thinking, GROQ_MODELS } from '../../state/settings';
 import { firebaseConfigured, hostedAiEnabled } from '../../cloud/config';
 import { useAuth, signIn, signOut, deleteAccount } from '../../cloud/cloud';
 import {NativeHapticsControl} from './NativeHapticsControl';
@@ -59,12 +59,46 @@ function AiSettings() {
   const s = useSettings();
   const user = useAuth((x) => x.user);
   const [key, setKey] = useState(s.apiKey);
+  const [groqKey, setGroqKey] = useState(s.groqKey);
+  const [groqModel, setGroqModel] = useState(s.groqModel);
   const [aiConsent, setAiConsent] = useState(hasAiConsent);
+  const groq = s.provider === 'groq';
   // Pick up a key that arrives from another signed-in device while Settings is open.
   useEffect(() => { setKey(s.apiKey); }, [s.apiKey]);
+  useEffect(() => { setGroqKey(s.groqKey); setGroqModel(s.groqModel); }, [s.groqKey, s.groqModel]);
   return (
     <>
-      {hostedAiEnabled && (
+      <div className="field">
+        <span>AI provider</span>
+        <div className="radio-cards">
+          <button className={`radio-card ${!groq ? 'on' : ''}`} onClick={() => s.set({ provider: 'gemini' })}>
+            <b>Gemini</b>
+            <span>Google. Hears your mix and samples.</span>
+          </button>
+          <button className={`radio-card ${groq ? 'on' : ''}`} onClick={() => s.set({ provider: 'groq' })}>
+            <b>Groq</b>
+            <span>Fast open models. Composes and edits; cannot listen.</span>
+          </button>
+        </div>
+      </div>
+      {groq && (
+        <>
+          <label className="field">
+            <span>Groq API key</span>
+            <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} onBlur={() => s.set({ groqKey: groqKey.trim() })} placeholder="gsk_…" autoComplete="off" spellCheck={false} />
+            <small>Get a free key at <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>. Saved only in this browser and sent only to Groq.</small>
+          </label>
+          <label className="field">
+            <span>Groq model</span>
+            <input list="groq-models" value={groqModel} onChange={(e) => setGroqModel(e.target.value)} onBlur={() => s.set({ groqModel: groqModel.trim() })} autoComplete="off" spellCheck={false} />
+            <datalist id="groq-models">
+              {GROQ_MODELS.map((m) => <option key={m.id} value={m.id}>{m.name} - {m.blurb}</option>)}
+            </datalist>
+            <small>Pick a suggestion or type any model id from <a href="https://console.groq.com/docs/models" target="_blank" rel="noreferrer">Groq's model list</a>. Voice messages are transcribed with Groq Whisper.</small>
+          </label>
+        </>
+      )}
+      {!groq && hostedAiEnabled && (
         <div className="field">
           <span>Connection</span>
           <div className="radio-cards">
@@ -79,25 +113,26 @@ function AiSettings() {
           </div>
         </div>
       )}
-      <label className="field">
+      {!groq && <label className="field">
         <span>Gemini API key</span>
         <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => s.set({ apiKey: key.trim() })} placeholder="AIza…" autoComplete="off" spellCheck={false} />
         <small>
           Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>.
           {user ? 'Saved in this browser and synced to your account so your other devices have it. Only sent to Google.' : 'Saved only in this browser and sent only to Google.'}
         </small>
-      </label>
+      </label>}
       <div className="ai-data-notice">
         <strong>Before using AI</strong>
-        <p>Prompts, project details, instructions, and audio you attach or let the agent listen to go to Google. Voice messages include your recording. Unpaid Gemini requests may be reviewed by people and used to improve Google products. Avoid personal, confidential, or sensitive material.</p>
+        {groq && <p>With Groq selected, prompts, project details, instructions and voice messages go to Groq instead, under <a href="https://groq.com/terms-of-use" target="_blank" rel="noopener noreferrer">Groq's terms</a>.</p>}
+        {!groq && <p>Prompts, project details, instructions, and audio you attach or let the agent listen to go to Google. Voice messages include your recording. Unpaid Gemini requests may be reviewed by people and used to improve Google products. Avoid personal, confidential, or sensitive material.</p>}
         <label className="toggle"><input type="checkbox" checked={aiConsent} onChange={event => { acknowledgeAi(event.target.checked); setAiConsent(hasAiConsent()); }} /><span>I am 18 or older, agree to Vibe's <a href="/terms/" target="_blank" rel="noopener noreferrer">Terms</a>, acknowledge its <a href="/privacy/" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and will use Gemini for professional or business purposes in a <a href="https://ai.google.dev/gemini-api/docs/available-regions" target="_blank" rel="noopener noreferrer">supported region</a>. I understand the data notice and will use a billing-enabled Google project if I am in the EEA, UK, or Switzerland. <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">Google's AI terms</a></span></label>
       </div>
-      <label className="field">
+      {!groq && <label className="field">
         <span>Model</span>
         <select value={s.model} onChange={(e) => s.set({ model: e.target.value as typeof s.model })}>
           {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name} - {m.blurb}</option>)}
         </select>
-      </label>
+      </label>}
       <label className="field">
         <span>Thinking</span>
         <select value={s.thinking} onChange={(e) => s.set({ thinking: e.target.value as Thinking })}>

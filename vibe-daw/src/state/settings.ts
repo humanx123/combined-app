@@ -13,15 +13,30 @@ export const MODELS = [
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]['id'];
+
+// Groq hosts open models behind an OpenAI-style API (llm.ts). Any id from
+// console.groq.com/docs/models works; these are suggestions known to handle tools.
+export const GROQ_MODELS = [
+  { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', blurb: 'Strongest tool use on Groq. Default.' },
+  { id: 'qwen/qwen3.8-27b', name: 'Qwen 3.8 27B', blurb: 'Balanced and quick.' },
+  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', blurb: 'Fast, no thinking step.' },
+] as const;
+export const DEFAULT_GROQ_MODEL = GROQ_MODELS[0].id;
+
+export type Provider = 'gemini' | 'groq';
 export type Connection = 'firebase' | 'apikey';
 export type Thinking = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
 export type ListeningQuality = 'full' | 'balanced' | 'compact';
 export type ListeningChannels = 'stereo' | 'mono';
 
 interface SettingsState {
+  /** Which model host the agent talks to. Listening (ears) needs Gemini. */
+  provider: Provider;
   model: ModelId;
   connection: Connection;
   apiKey: string;
+  groqKey: string;
+  groqModel: string;
   thinking: Thinking;
   /** Let the agent bounce and listen to its own work without asking. */
   autoListen: boolean;
@@ -56,9 +71,12 @@ export type SettingsValues = Omit<SettingsState, 'set'>;
 /** Fill defaults and drop invalid values, for localStorage and for settings synced from another device. */
 export function sanitizeSettings(saved: Partial<Record<keyof SettingsValues, unknown>>): SettingsValues {
   return {
+    provider: saved.provider === 'groq' ? 'groq' : 'gemini',
     model: MODELS.some((m) => m.id === saved.model) ? (saved.model as ModelId) : 'gemini-3.8-flash',
     connection: hostedAiEnabled ? (saved.connection === 'apikey' ? 'apikey' : 'firebase') : 'apikey',
     apiKey: typeof saved.apiKey === 'string' ? saved.apiKey : '',
+    groqKey: typeof saved.groqKey === 'string' ? saved.groqKey : '',
+    groqModel: typeof saved.groqModel === 'string' && saved.groqModel.trim() ? saved.groqModel.trim() : DEFAULT_GROQ_MODEL,
     thinking: THINKING.includes(saved.thinking as Thinking) ? (saved.thinking as Thinking) : 'MEDIUM',
     autoListen: typeof saved.autoListen === 'boolean' ? saved.autoListen : true,
     customInstructions: typeof saved.customInstructions === 'string' ? saved.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS) : '',
@@ -89,6 +107,9 @@ export function effectiveApiKey(): string {
 export function aiAvailable(): { ok: boolean; reason?: string } {
   if (!hasAiConsent()) return { ok: false, reason: 'Review the AI terms and data notice in Settings before using the agent.' };
   const s = useSettings.getState();
+  if (s.provider === 'groq') {
+    return s.groqKey.trim() ? { ok: true } : { ok: false, reason: 'Add a Groq API key in Settings to use the agent.' };
+  }
   if (s.connection === 'firebase') {
     return hostedAiEnabled ? { ok: true } : { ok: false, reason: 'Add your Gemini API key in Settings to use the agent.' };
   }

@@ -34,6 +34,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  // Gesto Studio serves Gesture Synth under /gesto/: it is a separate app with its own caching.
+  if (url.origin === self.location.origin && url.pathname.startsWith('/gesto/')) return;
   if (request.mode === 'navigate') event.respondWith(page(request));
   else if (url.origin === self.location.origin) {
     if (url.pathname.startsWith('/assets/')) event.respondWith(cacheFirst(request, ASSETS));
@@ -42,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   else if (FONT_HOSTS.has(url.hostname)) event.respondWith(staleWhileRevalidate(request, PAGES));
 });
 
-/** "/" is the prerendered landing page, other app routes share the empty shell, and legal pages keep their own offline copies. */
+/** "/" is the Gesto Studio launcher, other app routes share the empty shell, and legal pages keep their own offline copies. */
 async function page(request) {
   const cache = await caches.open(PAGES);
   const pathname = new URL(request.url).pathname;

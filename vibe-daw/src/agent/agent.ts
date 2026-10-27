@@ -188,7 +188,9 @@ export async function runAgent(text: string, opts: RunOptions = {}) {
   const system = systemPrompt(mode) + '\n\nUse manage_context to inspect the context budget or compact your working memory with a concise summary of goals, steering, decisions, useful sample/track ids, listening findings and unfinished work. Automatic compaction also runs when needed. Latest steering supersedes conflicting earlier instructions; skipped tool calls were not executed.';
   let planId: string | null = null;
   let plan: PlanStep[] = [];
-  let malformedRetried = false;
+  let malformedRetries = 0;
+  // Small open models (Groq, the free host) garble a tool call more often than Gemini: allow a few nudges.
+  const malformedLimit = useSettings.getState().provider === 'gemini' ? 1 : 3;
   let completed = false;
   const baseGoal = text.trim() ? text : 'The user asked by voice (see the voice message in the conversation).';
   let goal = baseGoal;
@@ -232,6 +234,7 @@ export async function runAgent(text: string, opts: RunOptions = {}) {
         {
           onText: (d) => { if (active()) patch(aid, (it) => (it.kind === 'assistant' ? { ...it, text: it.text + d } : it)); },
           onThought: (d) => { if (active()) patch(aid, (it) => (it.kind === 'assistant' ? { ...it, thinking: it.thinking + d } : it)); },
+          onWait: (sec) => { if (active()) setStatus(`Free model: one reply every ~30 s. Waiting ${sec} s…`); },
         },
       );
       checkActive();
@@ -244,9 +247,9 @@ export async function runAgent(text: string, opts: RunOptions = {}) {
       }
       if (!res.content.parts.length) {
         if (useAgent.getState().steering.length) continue;
-        if (res.finishReason === 'MALFORMED_FUNCTION_CALL' && !malformedRetried) {
+        if (res.finishReason === 'MALFORMED_FUNCTION_CALL' && malformedRetries < malformedLimit) {
           // Nudge once instead of failing the whole run.
-          malformedRetried = true;
+          malformedRetries++;
           const nudge: Part = { text: 'Your last tool call was malformed. Call the tool again with valid JSON arguments that match its schema.' };
           const last = history[history.length - 1];
           history = last?.role === 'user' ? [...history.slice(0, -1), { ...last, parts: [...last.parts, nudge] }] : [...history, { role: 'user', parts: [nudge] }];

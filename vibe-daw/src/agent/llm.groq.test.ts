@@ -7,7 +7,7 @@ const store = vi.hoisted(() => {
 });
 vi.mock('../cloud/firebase', () => ({ getFirebaseApp: async () => null }));
 
-import { streamGenerate, explainError, type Content } from './llm';
+import { streamGenerate, explainError, parseToolArgs, type Content } from './llm';
 import { useSettings } from '../state/settings';
 import { acknowledgeAi } from '../legal/acceptance';
 import { listen } from './ears';
@@ -90,10 +90,20 @@ describe('Groq transport', () => {
     expect(chat.messages).toEqual([{ role: 'user', content: '[Voice message, transcribed] add some piano\n\nthanks' }]);
   });
 
-  it('flags unparseable tool arguments so the agent retries the call', async () => {
-    fetchMock.mockResolvedValueOnce(sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'edit', arguments: '{"bars": [1,' } }] }, finish_reason: 'tool_calls' }] }]));
+  it('returns an unreadable tool call empty, the way the agent expects to retry it', async () => {
+    fetchMock.mockResolvedValueOnce(sse([{ choices: [{ delta: { content: 'Writing drums.', tool_calls: [{ index: 0, id: 'c1', function: { name: 'edit', arguments: '{"bars": [1,' } }] }, finish_reason: 'tool_calls' }] }]));
     const res = await streamGenerate({ contents: [{ role: 'user', parts: [{ text: 'go' }] }] });
     expect(res.finishReason).toBe('MALFORMED_FUNCTION_CALL');
+    expect(res.content.parts).toEqual([]);
+  });
+
+  it('recovers tool arguments wrapped in a fence or followed by stray text', () => {
+    expect(parseToolArgs('{"bpm": 150}')).toEqual({ bpm: 150 });
+    expect(parseToolArgs('```json\n{"steps": "x...", "note": "{not a brace}"}\n```')).toEqual({ steps: 'x...', note: '{not a brace}' });
+    expect(parseToolArgs('{"bpm": 150} and then some words')).toEqual({ bpm: 150 });
+    expect(parseToolArgs('')).toEqual({});
+    expect(parseToolArgs('[1,2]')).toBeNull();
+    expect(parseToolArgs('{"bars": [1,')).toBeNull();
   });
 
   it('explains Groq failures in producer terms', async () => {
@@ -105,5 +115,68 @@ describe('Groq transport', () => {
   it('refuses to "listen" on Groq instead of inventing a critique', async () => {
     await expect(listen({ project: {} as never } as never)).rejects.toThrow(/Listening needs Gemini/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Free provider (Pollinations, no key)', () => {
+  beforeEach(() => useSettings.getState().set({ provider: 'free', freeKey: '', freeModel: 'openai' }));
+
+  it('calls the free endpoint without a key and reads tool calls', async () => {
+    fetchMock.mockResolvedValueOnce(sse([
+      { choices: [{ delta: { reasoning: 'Tempo first.' } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 't1', function: { name: 'set_tempo', arguments: '{"bpm": 150}' } }] }, finish_reason: 'tool_calls' }] },
+    ]));
+    const res = await streamGenerate({ contents: [{ role: 'user', parts: [{ text: 'egg punk basic beats' }] }], tools: [{ name: 'set_tempo', description: 'tempo' }], thinking: 'MINIMAL', maxOutputTokens: 500 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://text.pollinations.ai/openai');
+    expect(init.headers.Authorization).toBeUndefined();
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe('openai');
+    expect(body.reasoning_effort).toBe('low'); // always low: the free host caps replies at 1500 tokens
+    expect(body.max_tokens).toBe(500);
+    expect(res.content.parts).toEqual([{ functionCall: { name: 'set_tempo', args: { bpm: 150 }, id: 't1' } }]);
+  });
+
+  it('leaves voice messages out instead of sending audio it cannot hear', async () => {
+    fetchMock.mockResolvedValueOnce(sse([{ choices: [{ delta: { content: 'Please type it.' }, finish_reason: 'stop' }] }]));
+    await streamGenerate({ contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: btoa('RIFF') } }] }] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages[0].content).toMatch(/voice message was left out/);
+  });
+
+  it('sends the optional token and explains a busy free tier', async () => {
+    useSettings.getState().set({ freeKey: 'pk_token' });
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ error: 'Too many requests. Retry after 0s' }), { status: 429 }));
+    const err = await streamGenerate({ contents: [{ role: 'user', parts: [{ text: 'hi' }] }] }).catch((e) => e);
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer pk_token');
+    // Four waits, then the general retry asks once more (also waiting four times) before giving up.
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(5);
+    expect(explainError(err)).toMatch(/one reply every 30 seconds/);
+  }, 20_000);
+
+  it('waits out the anonymous rate limit as the service asks, then answers', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'FREE_LIMIT', message: 'Free limit reached: 1 reply every 30 seconds per IP. Retry after 0s' } }), { status: 402 }))
+      .mockResolvedValueOnce(sse([{ choices: [{ delta: { content: 'Here you go.' }, finish_reason: 'stop' }] }]));
+    const waits: number[] = [];
+    const res = await streamGenerate({ contents: [{ role: 'user', parts: [{ text: 'egg punk basic beats' }] }] }, { onWait: (s) => waits.push(s) });
+    expect(waits).toEqual([0]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(res.content.parts).toEqual([{ text: 'Here you go.' }]);
+    const sent = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(sent.reasoning_effort).toBe('low');
+    expect(sent.max_tokens).toBeUndefined();
+  });
+
+  it('keeps complete tool calls from a reply cut at the length cap', async () => {
+    fetchMock.mockResolvedValueOnce(sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: 'k', function: { name: 'create_track', arguments: '{"name":"Drums"}' } }] }, finish_reason: 'length' }] }]));
+    const res = await streamGenerate({ contents: [{ role: 'user', parts: [{ text: 'go' }] }] });
+    expect(res.finishReason).toBe('STOP');
+    expect(res.content.parts).toEqual([{ functionCall: { name: 'create_track', args: { name: 'Drums' }, id: 'k' } }]);
+  });
+
+  it('refuses to listen on the free model too', async () => {
+    await expect(listen({ project: {} as never } as never)).rejects.toThrow(/the free model cannot hear audio/);
   });
 });

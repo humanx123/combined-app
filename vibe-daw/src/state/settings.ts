@@ -23,7 +23,13 @@ export const GROQ_MODELS = [
 ] as const;
 export const DEFAULT_GROQ_MODEL = GROQ_MODELS[0].id;
 
-export type Provider = 'gemini' | 'groq';
+// Pollinations serves open models free, without a key (an optional token raises its limits).
+export const FREE_MODELS = [
+  { id: 'openai', name: 'GPT-OSS 20B (free)', blurb: 'No key needed. One reply every ~30 s without a token; composes and edits, cannot listen.' },
+] as const;
+export const DEFAULT_FREE_MODEL = FREE_MODELS[0].id;
+
+export type Provider = 'gemini' | 'groq' | 'free';
 export type Connection = 'firebase' | 'apikey';
 export type Thinking = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
 export type ListeningQuality = 'full' | 'balanced' | 'compact';
@@ -37,6 +43,9 @@ interface SettingsState {
   apiKey: string;
   groqKey: string;
   groqModel: string;
+  /** Optional Pollinations token for the free provider. */
+  freeKey: string;
+  freeModel: string;
   thinking: Thinking;
   /** Let the agent bounce and listen to its own work without asking. */
   autoListen: boolean;
@@ -71,12 +80,14 @@ export type SettingsValues = Omit<SettingsState, 'set'>;
 /** Fill defaults and drop invalid values, for localStorage and for settings synced from another device. */
 export function sanitizeSettings(saved: Partial<Record<keyof SettingsValues, unknown>>): SettingsValues {
   return {
-    provider: saved.provider === 'groq' ? 'groq' : 'gemini',
+    provider: saved.provider === 'groq' || saved.provider === 'free' ? saved.provider : 'gemini',
     model: MODELS.some((m) => m.id === saved.model) ? (saved.model as ModelId) : 'gemini-3.8-flash',
     connection: hostedAiEnabled ? (saved.connection === 'apikey' ? 'apikey' : 'firebase') : 'apikey',
     apiKey: typeof saved.apiKey === 'string' ? saved.apiKey : '',
     groqKey: typeof saved.groqKey === 'string' ? saved.groqKey : '',
     groqModel: typeof saved.groqModel === 'string' && saved.groqModel.trim() ? saved.groqModel.trim() : DEFAULT_GROQ_MODEL,
+    freeKey: typeof saved.freeKey === 'string' ? saved.freeKey : '',
+    freeModel: typeof saved.freeModel === 'string' && saved.freeModel.trim() ? saved.freeModel.trim() : DEFAULT_FREE_MODEL,
     thinking: THINKING.includes(saved.thinking as Thinking) ? (saved.thinking as Thinking) : 'MEDIUM',
     autoListen: typeof saved.autoListen === 'boolean' ? saved.autoListen : true,
     customInstructions: typeof saved.customInstructions === 'string' ? saved.customInstructions.slice(0, MAX_CUSTOM_INSTRUCTIONS) : '',
@@ -107,6 +118,7 @@ export function effectiveApiKey(): string {
 export function aiAvailable(): { ok: boolean; reason?: string } {
   if (!hasAiConsent()) return { ok: false, reason: 'Review the AI terms and data notice in Settings before using the agent.' };
   const s = useSettings.getState();
+  if (s.provider === 'free') return { ok: true };
   if (s.provider === 'groq') {
     return s.groqKey.trim() ? { ok: true } : { ok: false, reason: 'Add a Groq API key in Settings to use the agent.' };
   }

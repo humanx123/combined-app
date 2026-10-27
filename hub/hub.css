@@ -54,7 +54,8 @@ a { color: inherit; }
 .hint { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
 .ia { display: block; }
 .ia-head { margin-bottom: 14px; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+@media (max-width: 520px) { .seg { grid-template-columns: 1fr; } }
 .seg button { all: unset; cursor: pointer; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); font-weight: 600; display: flex; flex-direction: column; gap: 2px; background: rgba(255,255,255,.03); }
 .seg button small { font-weight: 400; color: var(--muted); font-size: 13px; }
 .seg button[aria-checked="true"] { border-color: transparent; background: linear-gradient(135deg, rgba(124,58,237,.55), rgba(236,72,153,.45)); }

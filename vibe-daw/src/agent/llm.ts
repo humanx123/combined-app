@@ -10,6 +10,7 @@ function requireAiConsent() {
 //  - 'apikey'   → @google/genai straight to the Gemini API (dev / bring-your-own-key)
 //  - 'firebase' → Firebase AI Logic (production: no key in the bundle, App Check enforced)
 //  - 'groq'     → Groq's OpenAI-style API with the user's own key (provider setting)
+//  - 'free'     → Pollinations' OpenAI-style API: open models, no key needed
 // Parts are passed through untouched so Gemini 3+ thought signatures survive the round trip.
 
 export interface Part {
@@ -42,12 +43,16 @@ export interface LlmRequest {
   temperature?: number;
   /** Ask for JSON output. */
   json?: boolean;
+  /** false: send no thinking settings at all (models that refuse every explicit level). */
+  thoughts?: false;
   maxOutputTokens?: number;
 }
 
 export interface StreamHandlers {
   onText?: (delta: string) => void;
   onThought?: (delta: string) => void;
+  /** The free host is rate-limited: waiting this many seconds before asking again. */
+  onWait?: (seconds: number) => void;
 }
 
 export interface LlmResult {
@@ -112,7 +117,7 @@ async function streamDirect(req: LlmRequest, h: StreamHandlers): Promise<LlmResu
     config: {
       systemInstruction: req.system,
       tools: req.tools?.length ? [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, ...(t.parameters ? { parametersJsonSchema: t.parameters } : {}) })) }] : undefined,
-      thinkingConfig: { includeThoughts: true, ...(req.thinking ? { thinkingLevel: req.thinking as never } : {}) },
+      thinkingConfig: req.thoughts === false ? undefined : { includeThoughts: true, ...(req.thinking ? { thinkingLevel: req.thinking as never } : {}) },
       temperature: req.temperature,
       responseMimeType: req.json ? 'application/json' : undefined,
       maxOutputTokens: req.maxOutputTokens,
@@ -143,7 +148,7 @@ async function streamFirebase(req: LlmRequest, h: StreamHandlers): Promise<LlmRe
     systemInstruction: req.system,
     tools: req.tools?.length ? [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, ...(t.parameters ? { parameters: t.parameters as never } : {}) })) }] : undefined,
     generationConfig: {
-      thinkingConfig: { includeThoughts: true, ...(req.thinking ? { thinkingLevel: req.thinking as never } : {}) },
+      thinkingConfig: req.thoughts === false ? undefined : { includeThoughts: true, ...(req.thinking ? { thinkingLevel: req.thinking as never } : {}) },
       temperature: req.temperature,
       responseMimeType: req.json ? 'application/json' : undefined,
       maxOutputTokens: req.maxOutputTokens,
@@ -162,13 +167,34 @@ async function streamFirebase(req: LlmRequest, h: StreamHandlers): Promise<LlmRe
   return { content: { role: 'model', parts: compact(parts) }, usage, finishReason };
 }
 
-// ---------------------------------------------------------------- Groq (OpenAI-style API)
-// Groq has no audio input: voice messages are transcribed with Whisper first, and the
-// listening tools (ears.ts) refuse to run. Reasoning streams to onThought but is not kept
-// in history, so switching back to Gemini mid-chat never sends it foreign thought parts.
+// ---------------------------------------------------------------- OpenAI-style hosts (Groq, free)
+// Neither host takes audio: Groq transcribes voice messages with Whisper first, the free host
+// leaves them out, and the listening tools (ears.ts) refuse to run. Reasoning streams to
+// onThought but is not kept in history, so switching back to Gemini mid-chat never sends it
+// foreign thought parts.
 
 const GROQ_API = 'https://api.groq.com/openai/v1';
+const FREE_CHAT = 'https://text.pollinations.ai/openai';
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
+
+interface CompatHost {
+  /** Starts every error ("Groq 429: …") so explainError can tell hosts apart. */
+  name: 'Groq' | 'Pollinations';
+  chatUrl: string;
+  /** Empty for the free host without a token. */
+  key: string;
+  model: string;
+  /** Groq transcribes voice messages; the free host can't. */
+  transcribes: boolean;
+}
+
+function compatHost(): CompatHost {
+  const s = useSettings.getState();
+  if (s.provider === 'free') return { name: 'Pollinations', chatUrl: FREE_CHAT, key: s.freeKey.trim(), model: s.freeModel, transcribes: false };
+  return { name: 'Groq', chatUrl: `${GROQ_API}/chat/completions`, key: groqKey(), model: s.groqModel, transcribes: true };
+}
+
+const authHeader = (key: string): Record<string, string> => (key ? { Authorization: `Bearer ${key}` } : {});
 
 type GroqMessage =
   | { role: 'system' | 'user'; content: string }
@@ -190,10 +216,13 @@ function groqKey(): string {
   return key;
 }
 
-async function groqError(res: Response): Promise<Error> {
+async function hostError(name: CompatHost['name'], res: Response): Promise<Error> {
   let detail = '';
-  try { detail = ((await res.json()) as { error?: { message?: string } }).error?.message ?? ''; } catch { /* not JSON */ }
-  return new Error(`Groq ${res.status}: ${detail || res.statusText}`);
+  try {
+    const body = (await res.json()) as { error?: { message?: string } | string };
+    detail = typeof body.error === 'string' ? body.error : body.error?.message ?? '';
+  } catch { /* not JSON */ }
+  return new Error(`${name} ${res.status}: ${detail || res.statusText}`);
 }
 
 // The agent resends a run's history every turn, so each voice clip is transcribed once.
@@ -208,13 +237,13 @@ async function transcribe(audio: NonNullable<Part['inlineData']>, signal?: Abort
   form.append('file', new Blob([bytes], { type: audio.mimeType }), 'voice.wav');
   form.append('model', WHISPER_MODEL);
   const res = await fetch(`${GROQ_API}/audio/transcriptions`, { method: 'POST', headers: { Authorization: `Bearer ${groqKey()}` }, body: form, signal });
-  if (!res.ok) throw await groqError(res);
+  if (!res.ok) throw await hostError('Groq', res);
   const text = (((await res.json()) as { text?: string }).text ?? '').trim();
   transcripts.set(id, text);
   return text;
 }
 
-async function toGroqMessages(req: LlmRequest): Promise<GroqMessage[]> {
+async function toGroqMessages(req: LlmRequest, host: CompatHost): Promise<GroqMessage[]> {
   const out: GroqMessage[] = [];
   if (req.system) out.push({ role: 'system', content: req.system });
   // Gemini calls may have no id: pair each response with the open call of the same name.
@@ -240,9 +269,11 @@ async function toGroqMessages(req: LlmRequest): Promise<GroqMessage[]> {
         const id = i >= 0 ? open.splice(i, 1)[0].id : r.id ?? `call_${next++}`;
         out.push({ role: 'tool', tool_call_id: id, content: JSON.stringify(r.response) });
       } else if (p.inlineData?.mimeType.startsWith('audio/')) {
-        texts.push(`[Voice message, transcribed] ${await transcribe(p.inlineData, req.signal)}`);
+        texts.push(host.transcribes
+          ? `[Voice message, transcribed] ${await transcribe(p.inlineData, req.signal)}`
+          : '(A voice message was left out: this free model cannot hear audio. Ask the user to type the request.)');
       } else if (p.inlineData) {
-        texts.push('(An attachment was left out: the Groq model in use cannot see it.)');
+        texts.push(`(An attachment was left out: the ${host.name} model in use cannot see it.)`);
       } else if (p.text && !p.thought) {
         texts.push(p.text);
       }
@@ -252,32 +283,93 @@ async function toGroqMessages(req: LlmRequest): Promise<GroqMessage[]> {
   return out;
 }
 
+/**
+ * Tool arguments as an object. Small open models sometimes wrap the JSON in a code fence or
+ * trail text after it; the first complete object is kept. Null when there is none.
+ */
+export function parseToolArgs(raw: string): Record<string, unknown> | null {
+  const text = raw.trim();
+  if (!text) return {};
+  try {
+    const v = JSON.parse(text);
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  } catch { /* try to recover below */ }
+  const start = text.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) {
+      try {
+        const v = JSON.parse(text.slice(start, i + 1));
+        return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+      } catch { return null; }
+    }
+  }
+  return null;
+}
+
+const FREE_RETRIES = 4;
+
+/** Seconds a rate-limited reply asks us to wait (Retry-After header, or "Retry after 23s" in the body). */
+async function retryAfter(res: Response): Promise<number> {
+  const header = Number(res.headers.get('retry-after'));
+  if (header > 0) return Math.min(90, header);
+  try {
+    const m = (await res.clone().text()).match(/retry after (\d+)\s*s/i);
+    if (m) return Math.min(90, Number(m[1]));
+  } catch { /* unreadable body */ }
+  return 30;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+  });
+}
+
 const GROQ_EFFORT: Record<Thinking, 'low' | 'medium' | 'high'> = { MINIMAL: 'low', LOW: 'low', MEDIUM: 'medium', HIGH: 'high' };
 const GROQ_FINISH: Record<string, string> = { stop: 'STOP', tool_calls: 'STOP', length: 'MAX_TOKENS', content_filter: 'SAFETY' };
 
-async function streamGroq(req: LlmRequest, h: StreamHandlers): Promise<LlmResult> {
-  // req.model names a Gemini model when callers pick one; on Groq the user's choice wins.
-  const model = useSettings.getState().groqModel;
-  const reasoning = model.startsWith('openai/gpt-oss')
-    ? { reasoning_effort: GROQ_EFFORT[req.thinking ?? 'MEDIUM'], include_reasoning: true }
+async function streamCompat(req: LlmRequest, h: StreamHandlers): Promise<LlmResult> {
+  // req.model names a Gemini model when callers pick one; on these hosts the user's choice wins.
+  const host = compatHost();
+  const model = host.model;
+  // The free host cuts every reply at 1500 tokens whatever max_tokens says, and GPT-OSS can spend
+  // all of them reasoning before it acts. Low effort leaves room for the tool calls.
+  const reasoning = host.name !== 'Groq' ? { reasoning_effort: 'low' }
+    : model.startsWith('openai/gpt-oss') ? { reasoning_effort: GROQ_EFFORT[req.thinking ?? 'MEDIUM'], include_reasoning: true }
     : model.startsWith('qwen/') ? { reasoning_format: 'parsed' } : {};
-  const res = await fetch(`${GROQ_API}/chat/completions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${groqKey()}`, 'Content-Type': 'application/json' },
-    signal: req.signal,
-    body: JSON.stringify({
+  const maxTokens = req.maxOutputTokens;
+  const body = JSON.stringify({
       model,
-      messages: await toGroqMessages(req),
+      messages: await toGroqMessages(req, host),
       stream: true,
       stream_options: { include_usage: true },
       temperature: req.temperature,
-      max_completion_tokens: req.maxOutputTokens,
+      ...(maxTokens ? (host.name === 'Groq' ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }) : {}),
       ...(req.tools?.length ? { tools: req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters ?? { type: 'object', properties: {} } } })) } : {}),
       ...(req.json ? { response_format: { type: 'json_object' } } : {}),
       ...reasoning,
-    }),
-  });
-  if (!res.ok || !res.body) throw await groqError(res);
+    });
+  let res: Response;
+  // Anonymous free use allows one reply every ~30 s per connection: wait as told, then ask again.
+  for (let tries = 0; ; tries++) {
+    res = await fetch(host.chatUrl, { method: 'POST', headers: { ...authHeader(host.key), 'Content-Type': 'application/json' }, signal: req.signal, body });
+    if (host.name !== 'Pollinations' || (res.status !== 402 && res.status !== 429) || tries >= FREE_RETRIES) break;
+    const seconds = await retryAfter(res);
+    h.onWait?.(seconds);
+    await sleep(seconds * 1000 + 400, req.signal);
+  }
+  if (!res.ok || !res.body) throw await hostError(host.name, res);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -311,16 +403,25 @@ async function streamGroq(req: LlmRequest, h: StreamHandlers): Promise<LlmResult
     }
   }
 
+  // Cut at the length cap but with every tool call complete: the calls are usable, the turn is not lost.
+  if (finishReason === 'MAX_TOKENS' && calls.length && calls.every((c) => c && parseToolArgs(c.args))) finishReason = 'STOP';
   const parts: Part[] = text ? [{ text }] : [];
   for (const c of calls.filter(Boolean)) {
-    let args: Record<string, unknown> = {};
-    try { args = c.args ? JSON.parse(c.args) : {}; } catch { finishReason = 'MALFORMED_FUNCTION_CALL'; }
+    // GPT-OSS sometimes leaks its channel markup into the name ("update_plan<|channel|>commentary").
+    c.name = c.name.split('<|')[0].trim();
+    const args = parseToolArgs(c.args);
+    // Like Gemini, a call that can't be read comes back empty, so the agent asks for it again.
+    if (!args) return { content: { role: 'model', parts: [] }, usage, finishReason: 'MALFORMED_FUNCTION_CALL' };
     parts.push({ functionCall: { name: c.name, args, ...(c.id ? { id: c.id } : {}) } });
   }
   return { content: { role: 'model', parts }, usage, finishReason };
 }
 
 // ---------------------------------------------------------------- public
+
+const isThinkingError = (msg: string) => /thinking/i.test(msg) && /400|INVALID_ARGUMENT|not supported|invalid/i.test(msg);
+const THINKING_STEPS: Array<Pick<LlmRequest, 'thinking' | 'thoughts'>> = [{ thinking: 'LOW', thoughts: undefined }, { thinking: undefined, thoughts: false }];
+const thinkingFallback = new Map<string, Pick<LlmRequest, 'thinking' | 'thoughts'>>();
 
 type Override = (req: LlmRequest, h: StreamHandlers) => Promise<LlmResult>;
 let override: Override | null = null;
@@ -332,16 +433,31 @@ export function setLlmOverride(fn: Override | null) {
 export async function streamGenerate(req: LlmRequest, h: StreamHandlers = {}): Promise<LlmResult> {
   if (override) return override(req, h);
   requireAiConsent();
-  const { provider, connection } = useSettings.getState();
-  const attempt = (r: LlmRequest) => (provider === 'groq' ? streamGroq(r, h) : connection === 'firebase' ? streamFirebase(r, h) : streamDirect(r, h));
+  const { provider, connection, model } = useSettings.getState();
+  const attempt = (r: LlmRequest) => (provider !== 'gemini' ? streamCompat(r, h) : connection === 'firebase' ? streamFirebase(r, h) : streamDirect(r, h));
+  const modelKey = `${provider}:${req.model ?? model}`;
+  const known = thinkingFallback.get(modelKey);
+  const first = known ? { ...req, ...known } : req;
   try {
-    return await attempt(req);
+    return await attempt(first);
   } catch (e) {
     if (req.signal?.aborted) throw e;
     const msg = String((e as Error)?.message ?? e);
-    // Some models don't accept every thinking level - retry with the model's default.
-    if (req.thinking && /thinking/i.test(msg) && /400|INVALID_ARGUMENT|not supported|invalid/i.test(msg)) {
-      return attempt({ ...req, thinking: undefined });
+    // Models differ in the thinking levels they take, and some refuse the very level they
+    // default to (so asking for "the model's default" fails the same way). Step to LOW, then
+    // to no thinking settings at all, and remember what this model accepted.
+    if (isThinkingError(msg)) {
+      for (const next of THINKING_STEPS) {
+        if (known && next.thinking === known.thinking && next.thoughts === known.thoughts) continue;
+        try {
+          const out = await attempt({ ...req, ...next });
+          thinkingFallback.set(modelKey, next);
+          return out;
+        } catch (e2) {
+          if (req.signal?.aborted || !isThinkingError(String((e2 as Error)?.message ?? e2))) throw e2;
+        }
+      }
+      throw e;
     }
     // One retry on transient overload / network errors.
     if (/429|503|500|overloaded|UNAVAILABLE|fetch failed|network/i.test(msg)) {
@@ -360,6 +476,10 @@ export async function generateText(req: LlmRequest): Promise<string> {
 /** Turn API errors into something a producer can act on. */
 export function explainError(e: unknown): string {
   const msg = String((e as Error)?.message ?? e);
+  if (/^Pollinations /.test(msg)) {
+    if (/Pollinations (429|402)/.test(msg)) return 'The free model allows about one reply every 30 seconds without a key, and it is still busy. Try again in a minute, add a free Pollinations token (enter.pollinations.ai) or a free Groq key in Settings.';
+    if (/Pollinations 5\d\d/.test(msg)) return 'The free model service is down for a moment. Try again shortly, or switch to Gemini or Groq in Settings.';
+  }
   if (/^Groq /.test(msg)) {
     if (/Groq 401|invalid.api.key/i.test(msg)) return 'That Groq API key was rejected. Check it in Settings.';
     if (/Groq 429|rate.limit/i.test(msg)) return 'Groq rate limit hit. Wait a moment, or pick a smaller Groq model in Settings.';

@@ -5,7 +5,7 @@ import {
 } from '../icons';
 import { useAgent, runAgent, stopAgent, keepChanges, revertTo, type ChatItem } from '../../agent/agent';
 import { analyzeReference } from '../../agent/ears';
-import { useSettings, MODELS, aiAvailable } from '../../state/settings';
+import { useSettings, MODELS, GROQ_MODELS, FREE_MODELS, aiAvailable } from '../../state/settings';
 import { useDaw } from '../../state/store';
 import { Markdown } from '../Markdown';
 import { Dropdown } from './Dropdown';
@@ -132,6 +132,13 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
   const tokens = useAgent((s) => s.tokens);
   const context = useAgent((s) => s.context);
   const model = useSettings((s) => s.model);
+  const provider = useSettings((s) => s.provider);
+  const groqModel = useSettings((s) => s.groqModel);
+  const groqKey = useSettings((s) => s.groqKey);
+  const freeModel = useSettings((s) => s.freeModel);
+  const modelLabel = provider === 'groq' ? GROQ_MODELS.find((m) => m.id === groqModel)?.name ?? groqModel
+    : provider === 'free' ? FREE_MODELS.find((m) => m.id === freeModel)?.name ?? freeModel
+    : MODELS.find((m) => m.id === model)?.name;
   const [text, setText] = useState('');
   // Third mode next to Agent and Ask: Gesto plays and records chords by hand. Opened with /studio#gesto.
   const [view, setView] = useState<'chat' | 'gesto'>(() => (window.location.hash === '#gesto' ? 'gesto' : 'chat'));
@@ -345,8 +352,25 @@ export function AgentPanel({ open, focusSignal, onClose }: { open: boolean; focu
             <button className="btn icon" title="Attach a reference track - the agent listens and matches its style" onClick={() => fileRef.current?.click()} disabled={analyzing}><Paperclip size={15} /></button>
             <input ref={fileRef} type="file" accept="audio/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void attach(f); e.target.value = ''; }} />
             <Dropdown label="Model" className="model-selector" role="listbox" content={(close) => <>
-              {MODELS.map((m) => <button key={m.id} className="menu-item" role="option" aria-selected={model === m.id} onClick={() => { useSettings.getState().set({ model: m.id }); close(); }}><b>{m.name}{model === m.id && <Check size={13} />}</b><span>{m.blurb}</span></button>)}
-            </>}>{MODELS.find((m) => m.id === model)?.name}</Dropdown>
+              {/* Every provider in one list: picking a model also picks who runs it. */}
+              <div className="menu-heading">Gemini · hears your mix</div>
+              {MODELS.map((m) => {
+                const on = provider === 'gemini' && model === m.id;
+                return <button key={m.id} className="menu-item" role="option" aria-selected={on} onClick={() => { useSettings.getState().set({ provider: 'gemini', model: m.id }); close(); }}><b>{m.name}{on && <Check size={13} />}</b><span>{m.blurb}</span></button>;
+              })}
+              <div className="menu-divider" />
+              <div className="menu-heading">Groq{groqKey ? '' : ' · free key needed (Settings → AI)'}</div>
+              {GROQ_MODELS.map((m) => {
+                const on = provider === 'groq' && groqModel === m.id;
+                return <button key={m.id} className="menu-item" role="option" aria-selected={on} onClick={() => { useSettings.getState().set({ provider: 'groq', groqModel: m.id }); close(); }}><b>{m.name}{on && <Check size={13} />}</b><span>{m.blurb}</span></button>;
+              })}
+              <div className="menu-divider" />
+              <div className="menu-heading">Free · no key</div>
+              {FREE_MODELS.map((m) => {
+                const on = provider === 'free' && freeModel === m.id;
+                return <button key={m.id} className="menu-item" role="option" aria-selected={on} onClick={() => { useSettings.getState().set({ provider: 'free', freeModel: m.id }); close(); }}><b>{m.name}{on && <Check size={13} />}</b><span>{m.blurb}</span></button>;
+              })}
+            </>}>{modelLabel}</Dropdown>
             <div className="spacer" />
             {voiceSupported() && !recording && (
               <button

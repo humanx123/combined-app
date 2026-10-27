@@ -48,7 +48,8 @@ if (progression?.acordes?.length >= 2) {
 
 // ---------------------------------------------------------------- AI provider and key
 
-let provider = read(SETTINGS_KEY, {}).provider === 'groq' ? 'groq' : 'gemini';
+const PROVIDERS = ['gemini', 'groq', 'free'];
+let provider = PROVIDERS.includes(read(SETTINGS_KEY, {}).provider) ? read(SETTINGS_KEY, {}).provider : 'gemini';
 
 function fillModels(list) {
   $('modelos').replaceChildren(...list.map(([id, label]) => Object.assign(document.createElement('option'), { value: id, label })));
@@ -58,16 +59,20 @@ function render() {
   const s = read(SETTINGS_KEY, {});
   document.querySelectorAll('[data-proveedor]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.proveedor === provider)));
   const groq = provider === 'groq';
-  $('clave-etiqueta').textContent = groq ? 'Clave de Groq' : 'Clave de Gemini';
-  $('clave').placeholder = groq ? 'gsk_…' : 'AIza…';
-  $('clave').value = (groq ? s.groqKey : s.apiKey) ?? '';
+  const free = provider === 'free';
+  $('clave-etiqueta').textContent = groq ? 'Clave de Groq' : free ? 'Token de Pollinations (opcional)' : 'Clave de Gemini';
+  $('clave').placeholder = groq ? 'gsk_…' : free ? 'Déjalo vacío para usarlo sin cuenta' : 'AIza…';
+  $('clave').value = (groq ? s.groqKey : free ? s.freeKey : s.apiKey) ?? '';
   $('clave-ayuda').innerHTML = groq
     ? 'Gratis en <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>. Groq compone y edita, pero no puede escuchar el audio.'
+    : free ? 'Funciona sin clave (Pollinations, GPT-OSS 20B): más lento, compone y edita, pero no escucha el audio ni las notas de voz. Es un servicio público: no mandes nada privado.'
     : 'Gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>. Gemini además escucha tu mezcla y tus sonidos.';
+  $('campo-modelo').hidden = free;
   $('modelo').value = (groq ? s.groqModel : s.model) ?? (groq ? GROQ_SUGGESTED[0][0] : GEMINI_MODELS[0][0]);
   $('modelo').readOnly = false;
   $('modelo-ayuda').textContent = groq ? 'Elige una sugerencia o escribe cualquier modelo de Groq.' : 'Puedes cambiarlo luego en Ajustes del estudio.';
   fillModels(groq ? GROQ_SUGGESTED : GEMINI_MODELS);
+  $('guardar').textContent = free ? 'Usar gratis' : 'Probar y guardar';
   status('');
 }
 
@@ -80,6 +85,16 @@ async function checkGemini(key) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=50&key=${encodeURIComponent(key)}`);
   if (res.status === 400 || res.status === 401 || res.status === 403) throw new Error('Google rechazó esa clave.');
   if (!res.ok) throw new Error(`Google respondió ${res.status}. Prueba otra vez en un momento.`);
+}
+
+async function checkFree(key) {
+  const res = await fetch('https://text.pollinations.ai/openai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({ model: 'openai', messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 5 }),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error('Pollinations rechazó ese token. Déjalo vacío para usarlo sin cuenta.');
+  if (!res.ok) throw new Error(`El modelo gratis respondió ${res.status}. Puede estar ocupado: prueba en un momento.`);
 }
 
 async function checkGroq(key) {
@@ -99,12 +114,16 @@ $('form-ia').addEventListener('submit', async (e) => {
   e.preventDefault();
   const key = $('clave').value.trim();
   const model = $('modelo').value.trim();
-  if (!key) { status('Pega una clave primero.', 'mal'); return; }
+  if (!key && provider !== 'free') { status('Pega una clave primero.', 'mal'); return; }
   $('guardar').disabled = true;
   status('Probando la clave…');
   try {
     const s = read(SETTINGS_KEY, {});
-    if (provider === 'groq') {
+    if (provider === 'free') {
+      await checkFree(key);
+      write(SETTINGS_KEY, { ...s, provider: 'free', freeKey: key, freeModel: 'openai' });
+      status('Lista. El productor usará el modelo gratis (GPT-OSS 20B, sin clave).', 'ok');
+    } else if (provider === 'groq') {
       const available = await checkGroq(key);
       if (available.length) fillModels(available.map((id) => [id, id]));
       const chosen = model || GROQ_SUGGESTED[0][0];

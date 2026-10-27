@@ -63,6 +63,9 @@ function AiSettings() {
   const [groqModel, setGroqModel] = useState(s.groqModel);
   const [aiConsent, setAiConsent] = useState(hasAiConsent);
   const groq = s.provider === 'groq';
+  const free = s.provider === 'free';
+  const notGemini = groq || free;
+  const [freeKey, setFreeKey] = useState(s.freeKey);
   // Pick up a key that arrives from another signed-in device while Settings is open.
   useEffect(() => { setKey(s.apiKey); }, [s.apiKey]);
   useEffect(() => { setGroqKey(s.groqKey); setGroqModel(s.groqModel); }, [s.groqKey, s.groqModel]);
@@ -70,8 +73,8 @@ function AiSettings() {
     <>
       <div className="field">
         <span>AI provider</span>
-        <div className="radio-cards">
-          <button className={`radio-card ${!groq ? 'on' : ''}`} onClick={() => s.set({ provider: 'gemini' })}>
+        <div className="radio-cards three">
+          <button className={`radio-card ${!notGemini ? 'on' : ''}`} onClick={() => s.set({ provider: 'gemini' })}>
             <b>Gemini</b>
             <span>Google. Hears your mix and samples.</span>
           </button>
@@ -79,8 +82,19 @@ function AiSettings() {
             <b>Groq</b>
             <span>Fast open models. Composes and edits; cannot listen.</span>
           </button>
+          <button className={`radio-card ${free ? 'on' : ''}`} onClick={() => s.set({ provider: 'free' })}>
+            <b>Free</b>
+            <span>No key at all (Pollinations). Slower; cannot listen.</span>
+          </button>
         </div>
       </div>
+      {free && (
+        <label className="field">
+          <span>Pollinations token (optional)</span>
+          <input type="password" value={freeKey} onChange={(e) => setFreeKey(e.target.value)} onBlur={() => s.set({ freeKey: freeKey.trim() })} placeholder="Leave empty to use it anonymously" autoComplete="off" spellCheck={false} />
+          <small>Works without one. Without one it answers about once every 30 seconds; a free token from <a href="https://enter.pollinations.ai" target="_blank" rel="noreferrer">enter.pollinations.ai</a> removes the wait. Voice messages are not sent to this model.</small>
+        </label>
+      )}
       {groq && (
         <>
           <label className="field">
@@ -98,7 +112,7 @@ function AiSettings() {
           </label>
         </>
       )}
-      {!groq && hostedAiEnabled && (
+      {!notGemini && hostedAiEnabled && (
         <div className="field">
           <span>Connection</span>
           <div className="radio-cards">
@@ -113,7 +127,7 @@ function AiSettings() {
           </div>
         </div>
       )}
-      {!groq && <label className="field">
+      {!notGemini && <label className="field">
         <span>Gemini API key</span>
         <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onBlur={() => s.set({ apiKey: key.trim() })} placeholder="AIza…" autoComplete="off" spellCheck={false} />
         <small>
@@ -124,10 +138,11 @@ function AiSettings() {
       <div className="ai-data-notice">
         <strong>Before using AI</strong>
         {groq && <p>With Groq selected, prompts, project details, instructions and voice messages go to Groq instead, under <a href="https://groq.com/terms-of-use" target="_blank" rel="noopener noreferrer">Groq's terms</a>.</p>}
-        {!groq && <p>Prompts, project details, instructions, and audio you attach or let the agent listen to go to Google. Voice messages include your recording. Unpaid Gemini requests may be reviewed by people and used to improve Google products. Avoid personal, confidential, or sensitive material.</p>}
+        {free && <p>With Free selected, prompts, project details and instructions go to Pollinations, a free public service, under <a href="https://pollinations.ai/terms" target="_blank" rel="noopener noreferrer">its terms</a>. Don't send anything private.</p>}
+        {!notGemini && <p>Prompts, project details, instructions, and audio you attach or let the agent listen to go to Google. Voice messages include your recording. Unpaid Gemini requests may be reviewed by people and used to improve Google products. Avoid personal, confidential, or sensitive material.</p>}
         <label className="toggle"><input type="checkbox" checked={aiConsent} onChange={event => { acknowledgeAi(event.target.checked); setAiConsent(hasAiConsent()); }} /><span>I am 18 or older, agree to Vibe's <a href="/terms/" target="_blank" rel="noopener noreferrer">Terms</a>, acknowledge its <a href="/privacy/" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and will use Gemini for professional or business purposes in a <a href="https://ai.google.dev/gemini-api/docs/available-regions" target="_blank" rel="noopener noreferrer">supported region</a>. I understand the data notice and will use a billing-enabled Google project if I am in the EEA, UK, or Switzerland. <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">Google's AI terms</a></span></label>
       </div>
-      {!groq && <label className="field">
+      {!notGemini && <label className="field">
         <span>Model</span>
         <select value={s.model} onChange={(e) => s.set({ model: e.target.value as typeof s.model })}>
           {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name} - {m.blurb}</option>)}

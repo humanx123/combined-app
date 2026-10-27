@@ -1,0 +1,25 @@
+{
+  "id": "/studio",
+  "name": "Vibe",
+  "short_name": "Vibe",
+  "description": "The open source agentic DAW built to enhance, not replace, human creativity.",
+  "start_url": "/studio",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["music", "productivity", "entertainment"],
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/studio.webp", "sizes": "2880x1800", "type": "image/webp", "form_factor": "wide", "label": "The Vibe studio: timeline, Producer, and mixer" }
+  ],
+  "shortcuts": [
+    { "name": "Open the studio", "short_name": "Studio", "url": "/studio", "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

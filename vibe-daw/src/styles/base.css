@@ -1,0 +1,123 @@
+/* Vibe: studio at night.
+   Quiet ink-navy surfaces, colorful tracks, and one loud idea: everything the agent
+   touches is drawn in the brand gradient until you keep it. */
+
+:root {
+  --bg: #050505;
+  --panel: #0b0b0c;
+  --panel-2: #111113;
+  --raised: #1a1a1d;
+  --hover: #242428;
+  --line: #222225;
+  --line-soft: #161618;
+  --text: #ececee;
+  --muted: #a5a5ab;
+  --faint: #6f6f77;
+  /* The agent's ink. --agent-fill paints surfaces with the brand gradient (theme.ts swaps it
+     for a custom accent); --agent is its solid middle, for lines and text. */
+  --agent: #ff8fcf;
+  --agent-strong: #ffa8e8;
+  --agent-wash: rgba(255, 143, 207, 0.14);
+  --agent-line: rgba(255, 143, 207, 0.55);
+  --agent-fill: linear-gradient(100deg, #b69cff, #ff8fcf, #ffb547);
+  --agent-fill-strong: linear-gradient(100deg, #cfb5ff, #ffa8e8, #ffce60);
+  --agent-ink: #1a1430;
+  /* Three samples of the accent for agent icons (the #vibe-ink gradient in icons.tsx). */
+  --ink-0: #b69cff;
+  --ink-1: #ff8fcf;
+  --ink-2: #ffb547;
+  /* Tints in the gradient, for highlighted areas. Nothing in the agent's ink is one flat color. */
+  --agent-wash-fill: linear-gradient(100deg, color-mix(in srgb, var(--ink-0) 14%, transparent), color-mix(in srgb, var(--ink-1) 14%, transparent), color-mix(in srgb, var(--ink-2) 14%, transparent));
+  --agent-wash-strong: linear-gradient(100deg, color-mix(in srgb, var(--ink-0) 20%, transparent), color-mix(in srgb, var(--ink-1) 20%, transparent), color-mix(in srgb, var(--ink-2) 20%, transparent));
+  /* A glow in the accent's gradient: one soft shadow per color, left to right. */
+  --ink-glow: -16px 10px 22px -16px var(--ink-0), 0 10px 22px -16px var(--ink-1), 16px 10px 22px -16px var(--ink-2);
+  --ink-glow-flip: -16px 10px 22px -16px var(--ink-2), 0 10px 22px -16px var(--ink-1), 16px 10px 22px -16px var(--ink-0);
+  /* Color flow: accent surfaces drift along --agent-flow (the gradient there and back). */
+  --agent-flow: linear-gradient(100deg, #b69cff, #ff8fcf, #ffb547, #ff8fcf, #b69cff);
+  --flow-duration: 24s;
+  --flow-play: running;
+  /* The dot on the i: white on dark, ink on light. */
+  --logo-dot: #fff;
+  /* Depth: panels float on a deeper ground, lit from above. */
+  --app-bg: #000000;
+  --edge: rgba(255, 255, 255, 0.05);
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 140px);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+  --signal: #ffb547;
+  --rec: #ff5d73;
+  --ok: #3ddc97;
+  --warn: #ffd166;
+  --lane-a: #070708;
+  --lane-b: #0a0a0b;
+  --grid-bar: rgba(255, 255, 255, 0.075);
+  --grid-beat: rgba(255, 255, 255, 0.035);
+  --roll-white: #0f0f11;
+  --roll-inkey: #141416;
+  --roll-black: #050505;
+  --lcd-bg: #000000;
+  /* The transport display: dark and glowing here, a light recessed panel in Light. */
+  --display-bg: #000000;
+  --display-text: #ececee;
+  --display-pos: #ffb547;
+  --display-glow: rgba(255, 181, 71, 0.45);
+  --display-inset: rgba(0, 0, 0, 0.55);
+  --meter-bg: #000000;
+  --tooltip-bg: #111113;
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 14px;
+  --font-ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-lcd: 'Martian Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--line);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+/* The Interface size setting zooms #root, and viewport units inside it get zoomed too,
+   so the app sizes itself with percentages and only html uses the viewport height. */
+html, body, #root { height: 100%; margin: 0; }
+html { height: 100dvh; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  user-select: none;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* No focus rings anywhere. */
+*, *:focus, *:focus-visible { outline: none; }
+
+input[type='text'], input[type='password'], input[type='number'], input[type='search'], select, textarea {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 5px 8px;
+  outline: none;
+  user-select: text;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--raised); border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.boot { height: 100%; display: grid; place-items: center; color: var(--faint); }

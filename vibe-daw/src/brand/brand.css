@@ -1,0 +1,17 @@
+.vibe-wordmark, .vibe-mark { display: block; height: 1em; width: auto; overflow: visible; }
+.vibe-wordmark path, .vibe-mark path { fill: none; stroke-linecap: round; }
+/* Letters move from their own bottom center. */
+.vibe-letter, .vibe-dot { transform-box: fill-box; transform-origin: 50% 100%; }
+/* The dot glows a little on dark grounds. */
+.vibe-dot { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.45)); }
+[data-theme='light'] .vibe-dot { filter: none; }
+/* LayeredWordmark: each letter a box of its own, with its drawing filling it. Only the
+   paint takes the pointer, as in the SVG. */
+/* --u is one unit of the drawing, so lengths in filters match what they mean inside the SVG. */
+.vibe-layered { position: relative; container-type: inline-size; }
+.vibe-layered * { --u: calc(100cqw / var(--vibe-units)); }
+.vibe-layered .vibe-dot { filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(255, 255, 255, 0.45)); }
+[data-theme='light'] .vibe-layered .vibe-dot { filter: none; }
+.vibe-layered .vibe-letter, .vibe-layered .vibe-dot { position: absolute; pointer-events: none; }
+.vibe-layered svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
+.vibe-layered .vibe-letter:not(.vibe-glow) :is(path, circle) { pointer-events: visiblePainted; }

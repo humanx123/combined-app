@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+yarn-lock.lock
+
+# Production
+/dist/
+/*.tar.gz
+/*.tgz
+
+# Environment variables (CRITICAL - never commit)
+.env.local
+.env.*.local
+.env
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Binary
+*.exe
+*.out
+
+# Cloudflare
+.wrangler/
+wrangler.toml
+
+# Firebase
+.firebase/
+
+# Vite
+.vite/
+
+# Git
+*.gitignore
+
+# Security - Credentials
+*.key
+*.pem
+*.crt
+*.p12
+
+# Combined App Specific
+/deploy/
+/dist/
+/*.apk

@@ -1,0 +1,267 @@
+/* Landing. Same ink-navy palette as the studio (base.css :root), with the brand gradient
+   kept for what it means in the app: the agent's ink. */
+.landing { --flow-duration: 12s; color-scheme: dark; height: 100%; overflow-y: auto; overflow-x: hidden; background: var(--bg); color: var(--text); font-size: 17px; line-height: 1.6; text-align:center; user-select: text; scroll-behavior: smooth; }
+.landing a { color: inherit; text-decoration: none; }
+:where(.landing figure) { margin: 0; }
+:where(.landing img) { display: block; width: 100%; height: auto; }
+.lp-wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+
+.lp-btn { display: inline-flex; align-items: center; justify-content:center; gap:8px; min-height:48px; max-width:100%; padding:12px 22px; border-radius: var(--radius-m); background: var(--agent-fill); color: var(--agent-ink) !important; font-size: 15px; font-weight: 600; transition: transform 200ms, box-shadow 200ms; }
+/* The call to action: a flowing gradient with a glossy top, a breathing glow behind it, and a
+   sheen that sweeps across now and then. The gradients flow by sliding wider layers under a
+   clip, so every frame is compositing alone: no repaint, and no reblur of the glow's source. */
+.landing .lp-cta { position: relative; isolation: isolate; gap: 10px; height: 58px; padding: 0 24px 0 30px; border-radius: 14px; font-size: 17px; font-weight: 650;
+  background: none;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5), -22px 0 36px -18px rgba(182, 156, 255, 0.85), 0 0 36px -18px rgba(255, 143, 207, 0.8), 22px 0 36px -18px rgba(255, 181, 71, 0.85); }
+.landing .lp-cta:hover { transform: translateY(-2px); }
+.landing .lp-cta:active { transform: translateY(1px); }
+.lp-cta > * { position: relative; z-index: 1; }
+.lp-cta > .lp-cta-fill, .lp-cta > .lp-cta-glow { position: absolute; overflow: hidden; pointer-events: none; }
+/* The fill: a gradient 220% wide sliding 120% of the button, under the gloss and its edges. */
+.lp-cta > .lp-cta-fill { inset: 0; z-index: -2; border-radius: inherit; }
+.lp-cta-fill::before, .lp-cta-glow::before { content: ''; position: absolute; inset: 0 auto 0 0; will-change: transform; }
+.lp-cta-fill::before { width: 220%; background: linear-gradient(100deg, #b69cff, #ff8fcf, #ffb547, #ff8fcf, #b69cff); animation: lp-cta-flow var(--flow-duration) ease-in-out infinite alternate; }
+.lp-cta-fill::after { content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.14));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 0 -2px 0 rgba(0, 0, 0, 0.18); }
+/* The glow: the same flow at 200%, clipped to its rounded box and blurred on the compositor. */
+.lp-cta > .lp-cta-glow { inset: -4px; z-index: -1; border-radius: 20px; filter: blur(20px); opacity: 0.36; will-change: transform, opacity, filter; animation: lp-cta-glow 3.4s ease-in-out infinite; }
+.lp-cta-glow::before { width: 200%; background: var(--agent-flow); animation: lp-glow-flow var(--flow-duration) ease-in-out infinite alternate; }
+.lp-cta > .lp-sheen { position: absolute; inset: 0; z-index: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.lp-sheen::after { content: ''; will-change: transform; position: absolute; inset: 0 auto 0 0; width: 250%;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.6) 50%, transparent 62%); transform: translateX(90%); animation: lp-cta-sheen 5s ease-in-out 1.8s infinite; }
+.lp-cta svg { transition: transform 200ms ease; }
+.lp-cta:hover svg { transform: translateX(4px); }
+@keyframes lp-cta-flow { to { transform: translateX(-54.5454545%); } }
+@keyframes lp-glow-flow { to { transform: translateX(-50%); } }
+@keyframes lp-cta-glow { 50% { opacity: 0.58; transform: scale(1.04); } }
+@keyframes lp-cta-sheen { 0% { transform: translateX(90%); } 35%, 100% { transform: translateX(-150%); } }
+.lp-btn.ghost { background: var(--panel); color: var(--text) !important; box-shadow: inset 0 0 0 1px var(--line); }
+.lp-btn.ghost:hover { background: var(--raised); }
+.lp-actions { display: flex; justify-content:center; gap: 12px; flex-wrap: wrap; }
+
+.landing h1, .landing h2, .landing h3 { font-weight: 600; letter-spacing: -0.035em; margin: 0; text-wrap: balance; }
+.landing h1 { font-size: clamp(42px, 6.3vw, 86px); line-height: 1.02; max-width: 1080px; }
+.landing h2 { font-size: clamp(32px, 3.8vw, 50px); line-height: 1.06; }
+.landing h3 { font-size: 30px; line-height: 1.1; letter-spacing: -0.025em; }
+:where(.landing p) { color: var(--muted); margin: 0; }
+/* The promise, drawn like the wordmark: each letter is its own span so it can rise, wave and bop
+   with the logo, carries the same layers (a blurred glow of itself, a darker lip of its own
+   gradient underneath, the sheen on top), and takes its slice of one gradient that spans the
+   phrase and drifts there and back like the wordmark's. Landing.tsx measures --x and --w. */
+@property --lp-flow { syntax: '<number>'; inherits: true; initial-value: 0; }
+.landing mark { background: none; color: inherit; --w: 6.6em; animation: lp-flow var(--flow-duration) ease-in-out infinite alternate; }
+@keyframes lp-flow { to { --lp-flow: 1; } }
+.lp-word { white-space: nowrap; }
+.lp-face, .lp-lip::before, .lp-lip::after, .lp-letter::after { color: transparent; -webkit-background-clip: text; background-clip: text;
+  background-repeat: no-repeat, repeat-x; background-size: 100% 100%, calc(var(--w) * 2) 100%;
+  background-position: 0 0, calc(var(--lp-flow) * var(--w) - var(--x)) 0; }
+.lp-letter { --ink: linear-gradient(90deg, #b69cff, #ff8fcf 25%, #ffb547 50%, #ff8fcf 75%, #b69cff);
+  position: relative; z-index: 0; display: inline-block; transform-origin: 50% 100%; }
+/* The face: the letter in its slice of the gradient, under the sheen. */
+.lp-face { position: relative; display: inline-block;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04) 48%, rgba(0, 0, 0, 0) 56%, rgba(0, 0, 0, 0.14)), var(--ink); }
+/* Every layer pads past the advance so tails and overhangs keep their paint, and shares one box. */
+.lp-face, .lp-lip::before, .lp-lip::after, .lp-letter::after { padding: 0.14em 0.08em; margin: -0.14em -0.08em; }
+.lp-lip::before, .lp-lip::after, .lp-letter::after { content: attr(data-ch); position: absolute; inset: 0; pointer-events: none; }
+/* The lip: the letter swept straight down in its own gradient under 40% black. Copies every
+   eighth of the depth make it solid, so hard corners read as one block, not a ghost below. */
+.lp-lip { position: absolute; inset: 0; z-index: -1; }
+.lp-lip::before, .lp-lip::after { background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), var(--ink); transform: translateY(calc(var(--s) * 0.035em)); }
+.lp-lip::after { transform: translateY(calc((var(--s) + 0.125) * 0.035em)); }
+/* The glow: the letter blurred at a fifth strength, so it carries the gradient. */
+.lp-letter::after { z-index: -2; background-image: linear-gradient(transparent, transparent), var(--ink); filter: blur(0.07em); opacity: 0.2; }
+/* Its own compositor layer, so a bop moves pixels instead of repainting the flowing gradient each frame. */
+.lp-letter { will-change: transform; }
+/* Outside the hero a letter only bops. */
+.lp-letter.bop { animation: lp-bop 640ms linear; }
+/* It rises in just after the logo and joins the logo's wave, as if the word ran on into it. */
+.lp-hero mark .lp-letter { animation: lp-rise 900ms cubic-bezier(0.2, 1.4, 0.4, 1) both, lp-wave 7s ease-in-out infinite; animation-delay: calc(420ms + var(--i) * 45ms), calc(3.1s + var(--i) * 60ms); }
+.lp-hero mark .lp-letter.bop { animation: lp-rise 900ms cubic-bezier(0.2, 1.4, 0.4, 1) both, lp-wave 7s ease-in-out infinite, lp-bop 640ms linear; animation-delay: calc(420ms + var(--i) * 45ms), calc(3.1s + var(--i) * 60ms), 0ms; }
+
+/* The hero: centered, under a slow aurora in the brand colors. */
+.lp-hero { position: relative; overflow-x: clip; overflow-clip-margin: 0; display: flex; flex-direction: column; align-items: center; padding-top: calc(72px + max(env(safe-area-inset-top, 0px), var(--native-safe-top, 0px))); text-align: center; }
+.lp-hero > * { position: relative; }
+.lp-aurora { position: absolute !important; z-index: 0; top: -100px; left: 50%; width: min(1240px, 140vw); height: 780px; translate: -50% 0; pointer-events: none; opacity: 0.3; }
+/* Blur each blob once, then composite its movement. Blurring their moving parent
+   rerasterized the whole 1240 x 780 surface on every frame, especially costly at phone DPR,
+   and a filter on the moving layer itself reblurs it on every frame; the blur lives on a
+   child that is painted into the blob's layer once. */
+.lp-aurora i { position: absolute; border-radius: 50%; will-change: transform; }
+.lp-aurora i::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--c); filter: blur(80px); }
+.lp-aurora i:nth-child(1) { left: 12%; top: 6%; width: 44%; height: 60%; --c: #b69cff; animation: lp-aurora-a 19s ease-in-out infinite alternate; }
+.lp-aurora i:nth-child(2) { left: 36%; top: 22%; width: 38%; height: 50%; --c: #ff8fcf; animation: lp-aurora-b 23s ease-in-out infinite alternate; }
+.lp-aurora i:nth-child(3) { left: 54%; top: 2%; width: 34%; height: 46%; --c: #ffb547; opacity: 0.5; animation: lp-aurora-c 17s ease-in-out infinite alternate; }
+@keyframes lp-aurora-a { to { transform: translate(20%, 16%) scale(1.15); } }
+@keyframes lp-aurora-b { to { transform: translate(-24%, -12%) scale(0.88); } }
+@keyframes lp-aurora-c { to { transform: translate(-14%, 22%) scale(1.2); } }
+.lp-wordmark-wrap { width:min(800px,100%); }
+.lp-wordmark { width:100%; height:auto; }
+.lp-hero h1 { margin-top: 40px; font-size: clamp(42px, 5vw, 72px); line-height: 1.05; max-width: 900px; }
+.lp-hero-actions { display: flex; flex-wrap:wrap; justify-content:center; align-items: center; gap: 16px; margin-top: 32px; }
+
+/* The letters rise in on the beat, then the dot drops onto the i: the finishing touch. After
+   that the word does a small wave now and then, and the dot keeps time. */
+.lp-wordmark .vibe-letter, .lp-wordmark .vibe-dot { will-change: transform, opacity; }
+.lp-wordmark .vibe-letter { animation: lp-rise 900ms cubic-bezier(0.2, 1.4, 0.4, 1) both, lp-wave 7s ease-in-out infinite; animation-delay: calc(var(--i) * 90ms), calc(2.6s + var(--i) * 110ms); }
+.lp-wordmark .vibe-i .vibe-dot { animation: lp-drop 1100ms cubic-bezier(0.3, 0, 0.3, 1) 520ms both, lp-beat 1.6s ease-out 2.2s infinite; }
+@keyframes lp-rise { from { transform: translateY(26%); opacity: 0; } 40% { opacity: 1; } to { transform: none; opacity: 1; } }
+@keyframes lp-drop {
+  0% { transform: translateY(-260%); opacity: 0; }
+  12% { opacity: 1; }
+  38% { transform: translateY(0) scale(1.14, 0.84); }
+  52% { transform: translateY(-62%) scale(0.96, 1.05); }
+  66% { transform: translateY(0) scale(1.07, 0.93); }
+  78% { transform: translateY(-18%); }
+  88% { transform: translateY(0) scale(1.02, 0.98); }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes lp-wave { 0%, 10%, 100% { transform: none; } 3.5% { transform: translateY(-5%) scale(0.99, 1.03); } 7% { transform: translateY(0.6%); } }
+@keyframes lp-beat { 0%, 100% { filter: drop-shadow(0 0 calc(2.5 * var(--u, 1px)) rgba(255, 255, 255, 0.45)); } 12% { filter: drop-shadow(0 0 calc(6 * var(--u, 1px)) rgba(255, 255, 255, 0.7)); } }
+/* Each letter bounces on its own when you touch it. Keeping the other two in the list stops them restarting. */
+.lp-wordmark .vibe-letter.bop { animation: lp-rise 900ms cubic-bezier(0.2, 1.4, 0.4, 1) both, lp-wave 7s ease-in-out infinite, lp-bop 640ms linear; animation-delay: calc(var(--i) * 90ms), calc(2.6s + var(--i) * 110ms), 0ms; }
+/* The i's dot pops off on its own and lands again the way it did on load. It fits inside the bop,
+   which takes the class away when it ends. */
+.lp-wordmark .vibe-i.bop .vibe-dot { animation: lp-drop 1100ms cubic-bezier(0.3, 0, 0.3, 1) 520ms both, lp-beat 1.6s ease-out 2.2s infinite, lp-hop 640ms linear; }
+@keyframes lp-hop {
+  0% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  30% { transform: translateY(-150%) scale(0.94, 1.08); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  54% { transform: translateY(0) scale(1.14, 0.84); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  68% { transform: translateY(-40%) scale(0.96, 1.05); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  80% { transform: translateY(0) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  90% { transform: translateY(-10%); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  100% { transform: none; }
+}
+/* A spring: each segment eases the way gravity would, so the motion never stalls between keys. */
+@keyframes lp-bop {
+  0% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  32% { transform: translateY(-10%) scale(0.97, 1.04); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  56% { transform: translateY(1.5%) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  74% { transform: translateY(-2.5%) scale(0.995, 1.01); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  88% { transform: translateY(0.4%); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  100% { transform: none; }
+}
+
+/* Offscreen and background-tab motion retains its place without painting. */
+[data-lp-motion] { --lp-play: running; }
+[data-lp-motion='paused'] { --lp-play: paused; }
+:is(.landing mark, .lp-letter, .lp-letter.bop, .lp-aurora i, .lp-cta-fill::before, .lp-cta-glow, .lp-cta-glow::before, .lp-sheen::after, .lp-wordmark .vibe-letter, .lp-wordmark .vibe-letter.bop, .lp-wordmark .vibe-dot) { animation-play-state: var(--lp-play, running); }
+#support { scroll-margin-top: 48px; }
+
+.lp-hero-shot { position: relative; width: 100%; margin-top: 56px; }
+.lp-frame { min-width:0; background:transparent; }
+
+.lp-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; justify-items:center; padding-top: 88px; }
+.lp-copy { min-width:0; text-align:center; }
+.lp-copy h2 { margin:0; }
+.lp-producer { max-width: 360px; width: 100%; }
+.lp-band { margin-top: 64px; }
+.lp-band .lp-split { padding-block: 32px; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
+
+.lp-daw { padding-top: 72px; }
+.lp-daw-head { margin-bottom: 36px; }
+.lp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items:center; }
+.lp-grid .wide { grid-column: 1 / -1; }
+.lp-grid .lp-mixer { align-self: start; min-width: 0; }
+.lp-mixer img { width: 100%; height: auto; }
+.lp-promise { align-self: center; padding:0; }
+.lp-promise h3 { font-size:clamp(32px,3.8vw,50px); }
+
+.lp-end { padding-top: 88px; padding-bottom: 0; text-align: center; }
+.lp-theory { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:48px; align-items:center; justify-items:center; padding-top:64px; padding-bottom:32px; }
+.lp-theory-brand { display:flex; min-width:0; flex-direction:column; align-items:center; gap:32px; color:#f5f5f7; }
+.mtw-identity { width:100%; padding-top:12px; }
+.mtw-identity > svg { display:block; width:100%; height:auto; overflow:visible; }
+.lp-theory-brand picture.lp-theory-screen { display:block; width:100%; }
+.lp-theory-brand img { display:block; width:100%; height:auto; }
+.lp-theory-brand .lp-theory-shot { width:100%; max-height:none; height:auto; }
+.lp-theory .lp-btn { margin-top:28px; max-width:100%; white-space:normal; text-align:center; }
+@media(max-width:1000px) { .lp-theory { grid-template-columns:minmax(0,1fr); gap:32px; } .lp-theory-brand { max-width:640px; } }
+@media(max-width:720px) { .lp-theory { padding-top:48px; } .lp-theory-brand { gap:24px; } .lp-theory-brand picture.lp-theory-screen { max-width:400px; } }
+.lp-end h2 { font-size: clamp(36px, 4.6vw, 62px); max-width: 820px; margin: 0 auto 24px; }
+.lp-end > .lp-key-note { max-width: 620px; margin:0 auto 28px; font-size:14px; }
+.lp-end .lp-actions { justify-content: center; }
+.lp-support-line { font-size: 14px; margin: 36px auto 0; max-width: 520px; }
+.lp-wallets { max-width: 640px; margin: 0 auto; text-align: left; }
+.lp-wallets .lp-support-line { text-align: center; margin-bottom: 24px; }
+.lp-wallet { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 12px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line-soft); font-size: 14px; }
+.lp-wallet > span { grid-column: 1 / -1; display: flex; justify-content:center; gap: 10px; align-items: baseline; }
+.lp-wallet small { color: var(--faint); font-size: 12px; }
+.lp-wallet code { font: 11px/1.5 var(--font-lcd); color: var(--muted); overflow-wrap: anywhere; }
+.lp-wallet button { font-size: 12.5px; padding: 6px 10px; border-radius: var(--radius-s); box-shadow: inset 0 0 0 1px var(--line); color: var(--text); white-space: nowrap; }
+.lp-wallet button:hover, .lp-wallet button[aria-expanded='true'] { background: var(--raised); }
+.lp-qr-panel { grid-column: 1 / -1; display: grid; grid-template-rows: 1fr; animation: lp-qr-open 360ms cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.lp-qr-panel.closing { animation: lp-qr-close 240ms cubic-bezier(0.4, 0, 0.8, 0.4) both; }
+.lp-qr-panel > div { min-height: 0; overflow: hidden; display: flex; justify-content: center; }
+.lp-qr-panel .lp-qr { padding: 12px 0 28px; animation: lp-qr-pop 360ms cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.lp-qr-panel.closing .lp-qr { animation: lp-qr-drop 240ms ease-in both; }
+@keyframes lp-qr-open { from { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes lp-qr-close { to { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes lp-qr-pop { from { transform: translateY(-10px) scale(0.92); } }
+@keyframes lp-qr-drop { to { transform: translateY(-10px) scale(0.92); } }
+.lp-qr { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+/* Dark on white whatever the theme: scanners need the contrast. */
+.lp-qr svg, .lp-qr-wait { display: block; width: 220px; height: 220px; border-radius: 12px; background: #fff; }
+.lp-qr path { fill: #161925; }
+.lp-qr figcaption, .lp-qr-note { font-size: 13px; color: var(--muted); }
+.lp-status { display: block; width: fit-content; min-height: 20px; margin: 8px auto 0; font-size: 13px; color: transparent; background: var(--agent-fill); -webkit-background-clip: text; background-clip: text; }
+
+@media (max-width: 1000px) {
+  .lp-split, .lp-band .lp-split, .lp-daw-head { grid-template-columns: 1fr; gap: 48px; }
+  .lp-band .lp-split > figure { order: 1; }
+  .lp-producer { justify-self: center; }
+  .lp-promise { padding: 20px 0 0; }
+}
+@media (max-width: 720px) {
+  .landing { font-size: 16px; }
+  .lp-wrap { padding: 0 20px; }
+  .lp-hero { padding-top: calc(56px + max(env(safe-area-inset-top, 0px), var(--native-safe-top, 0px))); }
+  .lp-hero h1 { margin-top: 28px; }
+  .lp-hero-actions { margin-top: 32px; }
+  .lp-hero-shot { margin-top: 48px; padding-bottom: 0; }
+  .lp-bleed img { width:100%; }
+  .lp-split { padding-top: 56px; gap:28px; }
+  .lp-band { margin-top: 48px; }
+  .lp-band .lp-split { padding-block: 16px; gap:28px; }
+  .lp-daw { padding-top: 56px; }
+  .lp-daw-head { margin-bottom: 36px; gap: 20px; }
+  .lp-grid { grid-template-columns: 1fr; }
+  .lp-grid .wide { grid-column: auto; }
+  .lp-grid .wide img { width:100%; }
+  /* Scaled down, the screenshot's own rounded card is tighter than the frame's corners. */
+  .lp-inline { border-radius:0; }
+  .lp-end { padding-top: 64px; padding-bottom: 0; }
+}
+/* Sections rise in as they arrive, and the hero shot straightens as you scroll, driven by
+   the scroll position itself. Browsers without scroll timelines show everything still. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Start just before entry and finish near the viewport edge. These ranges depend
+       on viewport height, so tall sections don't stay hidden on landscape phones. */
+    .lp-reveal { animation: lp-reveal linear both; animation-timeline: view(); animation-range: entry -120px entry min(160px, 25svh); }
+    .lp-hero-shot .lp-frame { transform-origin: 50% 0; animation: lp-tilt linear both; animation-timeline: view(); animation-range: entry -120px entry min(360px, 65svh); }
+  }
+}
+@keyframes lp-reveal { from { opacity: 0; transform: translateY(64px) scale(0.98); } }
+@keyframes lp-tilt { from { transform: perspective(1400px) rotateX(18deg) scale(0.94); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing { scroll-behavior: auto; }
+  .landing mark, .lp-aurora i, .lp-btn, .lp-cta-fill::before, .lp-cta-glow, .lp-cta-glow::before, .lp-sheen::after { animation: none; transition: none; }
+  .lp-aurora i, .lp-cta-fill::before, .lp-cta-glow, .lp-cta-glow::before, .lp-sheen::after, .lp-wordmark .vibe-letter, .lp-wordmark .vibe-dot { will-change: auto; }
+  /* Still opens and closes, just without the motion. */
+  .lp-qr-panel, .lp-qr-panel .lp-qr { animation-duration: 1ms; }
+  .lp-wordmark .vibe-letter, .lp-wordmark .vibe-i .vibe-dot, .lp-wordmark .vibe-letter.bop, .lp-wordmark .vibe-i.bop .vibe-dot, .lp-hero mark .lp-letter, .lp-letter.bop { animation: none; }
+}
+.lp-legal { display:flex; flex-direction:column; align-items:center; gap:12px; padding-block:16px 40px; font-size:14px; }
+.lp-footer-brands { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:16px 36px; max-width:100%; }
+.lp-footer-brands a { display:flex; align-items:center; min-height:44px; max-width:100%; }
+.lp-footer-brands .lp-footer-vibe { width:84px; height:auto; }
+.lp-footer-brands img { width:210px; max-width:100%; height:auto; }
+.lp-footer-links { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px 24px; }
+.lp-footer-links a { display:inline-flex; min-height:44px; align-items:center; }
+.lp-legal a { text-underline-offset:4px; }
+.lp-legal a:hover { text-decoration:underline; }
+.lp-legal > p { font-size:13px; }
+.lp-legal > p a { color:var(--text); }
+.lp-legal a:focus-visible { outline:2px solid var(--agent,#b69cff); outline-offset:5px; border-radius:3px; }

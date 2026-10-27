@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <filter id="neon">
+      <feGaussianBlur stdDeviation="0.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="7" fill="#0a0a1a"/>
+  <!-- Subtle inner glow ring -->
+  <rect x="1.5" y="1.5" width="29" height="29" rx="5.5" fill="none" stroke="#ff00ff" stroke-width="0.3" opacity="0.2"/>
+  <!-- Music note (eighth note) in neon pink -->
+  <g filter="url(#neon)">
+    <!-- Note head (filled ellipse tilted) -->
+    <ellipse cx="12" cy="21" rx="3.5" ry="2.5" transform="rotate(-20 12 21)" fill="#ff00ff"/>
+    <!-- Stem -->
+    <line x1="15" y1="20" x2="15" y2="8" stroke="#ff00ff" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Flag -->
+    <path d="M15 8 Q20 10 19 15" stroke="#ff00ff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- Cyan sound wave arcs emanating to the right -->
+  <g filter="url(#neon)" fill="none" stroke="#00ffcc" stroke-linecap="round">
+    <path d="M20 12 Q23 16 20 20" stroke-width="1.4"/>
+    <path d="M23 10 Q27 16 23 22" stroke-width="1.2" opacity="0.75"/>
+    <path d="M26 8.5 Q30 16 26 23.5" stroke-width="1" opacity="0.5"/>
+  </g>
+</svg>

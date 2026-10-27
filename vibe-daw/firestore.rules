@@ -1,0 +1,89 @@
+rules_version = '2';
+
+// Every document lives under users/{uid}. A signed-in user can only touch their own tree.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // UID-only deletion tombstones block stale authenticated devices from restoring data.
+    match /account_deletions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.time.toMillis() - request.auth.token.auth_time * 1000 < 300000
+        && request.resource.data.keys().hasOnly(['requestedAt'])
+        && request.resource.data.requestedAt == request.time;
+      allow update, delete: if false;
+    }
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function activeOwner(uid) { return isOwner(uid) && !exists(/databases/$(database)/documents/account_deletions/$(uid)); }
+    match /users/{uid} { allow delete: if isOwner(uid) && exists(/databases/$(database)/documents/account_deletions/$(uid)); }
+    match /users/{uid}/legal/current {
+      allow delete: if isOwner(uid) && exists(/databases/$(database)/documents/account_deletions/$(uid));
+      allow read: if isOwner(uid);
+      allow create, update: if activeOwner(uid)
+        && request.resource.data.keys().hasOnly(['termsVersion', 'privacyVersion', 'adult', 'acceptedAt'])
+        && request.resource.data.termsVersion == '2026-10-20'
+        && request.resource.data.privacyVersion == '2026-10-20'
+        && request.resource.data.adult == true
+        && request.resource.data.acceptedAt == request.time;
+    }
+
+    match /users/{uid}/projects/{projectId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if activeOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'updatedAt', 'bpm', 'data', 'schemaVersion'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.data is string && request.resource.data.data.size() < 950000;
+    }
+
+    match /users/{uid}/samples/{sampleId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if activeOwner(uid) && request.resource.data.id == sampleId;
+    }
+
+    // Reusable clips, track sounds, effect profiles and project templates.
+    // Tombstones stay in this collection so offline devices cannot revive deletions.
+    match /users/{uid}/library/{presetId} {
+      allow delete: if isOwner(uid) && exists(/databases/$(database)/documents/account_deletions/$(uid));
+      allow read: if isOwner(uid);
+      function validItem() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['id', 'name', 'kind', 'tags', 'data', 'updatedAt', 'revision', 'deleted'])
+          && d.id == presetId
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 480
+          && d.kind in ['clip', 'sound', 'effects', 'template']
+          && d.tags is list && d.tags.size() <= 12
+          && d.data is string && d.data.size() < 800000
+          && d.updatedAt is number && d.updatedAt >= 0
+          && d.revision is string && d.revision.size() > 0 && d.revision.size() <= 100
+          && d.deleted is bool;
+      }
+      allow create: if activeOwner(uid) && validItem();
+      allow update: if activeOwner(uid) && validItem()
+        && (!resource.data.deleted || request.resource.data.deleted);
+    }
+
+    // AI settings (including the user's Gemini key), appearance and shortcuts.
+    // Each section is { data: JSON string, updatedAt: number }.
+    match /users/{uid}/prefs/{prefId} {
+      function validSection(d, k) {
+        return !(k in d) || (d[k] is map
+          && d[k].keys().hasOnly(['data', 'updatedAt'])
+          && d[k].data is string && d[k].data.size() < 20000
+          && d[k].updatedAt is number);
+      }
+      allow read, delete: if isOwner(uid);
+      allow create, update: if activeOwner(uid) && prefId == 'main'
+        && request.resource.data.keys().hasOnly(['ai', 'appearance', 'keymap'])
+        && validSection(request.resource.data, 'ai')
+        && validSection(request.resource.data, 'appearance')
+        && validSection(request.resource.data, 'keymap');
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

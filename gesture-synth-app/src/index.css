@@ -1,0 +1,2597 @@
+/* ─── Gesture Synth Weld — Liquid Glass Theme ──────────────────────── */
+
+:root {
+  --bg-primary: #0a0a1a;
+  --bg-secondary: #0d0d2b;
+  --bg-dark: #050510;
+
+  --neon-cyan: #00ffcc;
+  --neon-magenta: #ff00ff;
+  --neon-purple: #7850ff;
+  --neon-amber: #ffaa00;
+
+  --text-primary: #e0e0ff;
+  --text-secondary: #a0a0d0;
+  --text-muted: #606090;
+
+  --glass-bg: rgba(10, 15, 30, 0.75);
+  --glass-border: rgba(0, 255, 204, 0.15);
+
+  /* Liquid Glass (Apple-style frosted glass) */
+  --frost-bg: rgba(22, 22, 32, 0.55);
+  --frost-border: rgba(255, 255, 255, 0.08);
+  --frost-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --frost-blur: blur(24px) saturate(180%);
+
+  /* Frost taxonomy (2026-09-21): two families, never a full-screen blur.
+     - CHROME layer (translucent --frost-bg): toolbar, settings panel,
+       mobile ⋯ panel — always-on controls, thin metallic frost.
+     - CONTENT layer (near-opaque --panel-deep-bg + frost-blur): Help,
+       rec-sheet, recordings modal, loading block — text-heavy cards over
+       the live camera view, must stay readable. Overlays never dim or
+       blur the viewport (mobile-more-backdrop precedent: transparent
+       click-catcher only). */
+  --panel-deep-bg: rgba(10, 10, 24, 0.88);
+
+  --font-display: 'Orbitron', monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Bottom status-bar height — the What's-new playing-scene card anchors
+     above it (bottom: calc(var(--status-bar-h) + 10px), left corner). */
+  --status-bar-h: 42px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --status-bar-h: 36px;
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── Full-Screen App Layout ─────────────────────────────────────────── */
+
+.full-screen-app {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.camera-stage {
+  position: relative;
+  width: 100vw;
+  height: 100svh;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(0, 255, 204, 0.06) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 55%, rgba(120, 80, 255, 0.04) 0%, transparent 50%),
+    var(--bg-dark);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── Camera Placeholder — dimmed overlay, clear button area ──────── */
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Original layout: the whole stack (brand + content) centers together
+     — the brand moves naturally with content height. Deliberate: the
+     fixed-brand variants all created dead zones or cramped gaps. */
+  justify-content: center;
+  gap: 1.5rem;
+  text-align: center;
+  /* Dark vignette: edges dimmed, center clear around the button */
+  background: radial-gradient(
+    ellipse at center,
+    transparent 20%,
+    rgba(5, 5, 16, 0.15) 40%,
+    rgba(5, 5, 16, 0.55) 75%,
+    rgba(5, 5, 16, 0.7) 100%
+  );
+  pointer-events: none;
+}
+
+.camera-placeholder > * {
+  pointer-events: auto;
+}
+
+.camera-placeholder-brand {
+  margin-bottom: 0.5rem;
+  /* Pure display — never intercept clicks. On smaller screens the brand
+     can overlap the settings panel / main button; with pointer-events
+     off, clicks pass through to whatever is underneath (resolution-proof,
+     bug 2026-08-09: brand wordmark covered the keyboard toggle on a
+     13" Mac). */
+  pointer-events: none;
+}
+
+.camera-placeholder-brand-text {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, #00cc99 50%, var(--neon-magenta) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 8px rgba(0, 255, 204, 0.3));
+  animation: brand-float 3s ease-in-out infinite;
+}
+
+@keyframes brand-float {
+  0%, 100% { filter: drop-shadow(0 2px 8px rgba(0, 255, 204, 0.3)); }
+  50% { filter: drop-shadow(0 4px 16px rgba(0, 255, 204, 0.5)) drop-shadow(0 0 24px rgba(255, 0, 255, 0.2)); }
+}
+
+.camera-error-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 440px;
+  width: 100%;
+  text-align: left;
+}
+
+.camera-error-guide-item {
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: #c0c0d8;
+  line-height: 1.5;
+}
+
+.camera-error-guide-label {
+  display: inline-block;
+  padding: 1px 8px;
+  margin-right: 8px;
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.25);
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ff8888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.enable-camera-btn {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  background: var(--frost-bg);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid rgba(0, 255, 204, 0.35);
+  border-radius: 50px;
+  padding: 1rem 3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 30px rgba(0, 255, 204, 0.25), 0 0 60px rgba(0, 255, 204, 0.1), var(--frost-shadow);
+  animation: pulse-glow-glass 2s ease-in-out infinite;
+}
+
+.enable-camera-btn-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.enable-camera-btn:hover {
+  transform: scale(1.05);
+  border-color: rgba(0, 255, 204, 0.6);
+  box-shadow: 0 0 40px rgba(0, 255, 204, 0.4), 0 0 80px rgba(0, 255, 204, 0.2), var(--frost-shadow);
+}
+
+.enable-camera-btn:active {
+  transform: scale(0.98);
+}
+
+.enable-camera-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.enable-camera-btn.retry {
+  color: var(--neon-magenta);
+  border-color: rgba(255, 0, 255, 0.35);
+  box-shadow: 0 0 30px rgba(255, 0, 255, 0.2), 0 0 60px rgba(255, 0, 255, 0.08), var(--frost-shadow);
+}
+
+@keyframes pulse-glow-glass {
+  0%, 100% { box-shadow: 0 0 30px rgba(0, 255, 204, 0.25), 0 0 60px rgba(0, 255, 204, 0.1), var(--frost-shadow); }
+  50% { box-shadow: 0 0 45px rgba(0, 255, 204, 0.4), 0 0 80px rgba(0, 255, 204, 0.2), var(--frost-shadow); }
+}
+
+.camera-placeholder-hint {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  max-width: 360px;
+}
+
+/* New-feature announcement card. Two touchpoints (src/whatsNew.ts):
+   - LANDING: below the main button, TIME-based — shows while the
+     announcement is active (14-day window), then stops on its own; no ✕,
+     no dismissal (the player never has to close it, and it can't be
+     "seen once and lost"). Click = enter keyboard mode.
+   - PLAYING SCENE (--scene variant): floats below the top toolbar at the
+     same top-left corner Help uses — Help (z 100) covers it while open,
+     so the two never overlap at any resolution; DISMISSAL-based — shows
+     every session until the player closes it with the ✕. Desktop only
+     height-safe: toolbar is one nowrap row (~34px) at top 12px, so
+     top 64px clears it at every viewport width. */
+.whatsnew-card {
+  position: relative;
+  margin-top: 14px;
+  max-width: min(380px, 88vw);
+  background: rgba(255, 110, 199, 0.08);
+  border: 1px solid rgba(255, 110, 199, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 0 18px rgba(255, 110, 199, 0.12);
+  transition: all 0.15s ease;
+}
+.whatsnew-card:hover {
+  background: rgba(255, 110, 199, 0.12);
+  border-color: rgba(255, 110, 199, 0.5);
+}
+.whatsnew-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.whatsnew-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+.whatsnew-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 34px 12px 14px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 14px;
+  color: var(--neon-cyan);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.whatsnew-body:hover {
+  color: #7dffe6;
+}
+.whatsnew-badge {
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ff6ec7;
+  border: 1px solid rgba(255, 110, 199, 0.45);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Playing-scene variant (user decision 2026-08-09): DESKTOP anchors at
+   the screen's BOTTOM-LEFT, above the status bar (bottom = status-bar
+   height + 10px) — clear of the toolbar, Help (top-left), the centered
+   Scale Guide and the waveform band. MOBILE moves it TOP-LEFT below the
+   toolbar (media query below): the mobile toolbar shows only
+   Record/Help/⋯ so the top-left is free, while the bottom area is taken
+   by the Scale Guide's 8 degree blocks (bottom: 80px centered) — a
+   bottom card would cover them at near-full width. No backdrop-filter:
+   blurring the live canvas behind the card is a known mobile compositor
+   hog (suspected of starving the detection loop, 2026-08-09) — the
+   near-opaque background looks the same. TEACHING card: the body is NOT
+   clickable — it points at the toolbar control the entry declares
+   (pulseTarget), which pulses while the card is visible. */
+.whatsnew-card--scene {
+  position: absolute;
+  bottom: calc(var(--status-bar-h) + 10px);
+  left: 12px;
+  z-index: 90; /* under HelpModal (100), over canvas HUD */
+  width: min(360px, calc(100vw - 24px));
+  margin-top: 0;
+  background: rgba(8, 8, 20, 0.92);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+/* Informational (not a button) — no pointer cursor */
+.whatsnew-card--scene .whatsnew-body {
+  cursor: default;
+}
+/* Mobile (kept directly after the base rule — same-specificity overrides
+   must come later in the file, bug 2026-08-09: the earlier media-query
+   copy lost to the base rule and the card stretched between top+bottom):
+   the card can't sit at the bottom — the Scale Guide's 8 degree blocks
+   own that area (bottom: 80px, centered). EXPANDED: centered below the
+   compact mobile toolbar (Record/Help/⋯ only) — looks tidier than the
+   left corner (user decision 2026-08-09); the collapsed DOT stays
+   top-left (see .whatsnew-dot). */
+@media (max-width: 768px) {
+  .whatsnew-card--scene {
+    bottom: auto;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* Collapsed mobile dot — iOS floating-pill pattern (user decision
+   2026-08-09): after 4s the mobile card tucks into this small NEW pill
+   at the same corner; tap to re-expand. Desktop never collapses, so this
+   renders mobile-only. */
+.whatsnew-dot {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  z-index: 90;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ff6ec7;
+  border: 1px solid rgba(255, 110, 199, 0.45);
+  background: rgba(8, 8, 20, 0.92);
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(255, 110, 199, 0.25);
+  transition: all 0.15s ease;
+}
+.whatsnew-dot:hover {
+  background: rgba(255, 110, 199, 0.12);
+  border-color: rgba(255, 110, 199, 0.7);
+}
+.whatsnew-teach {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.66rem;
+  color: #b0b0d0;
+}
+
+/* Outbound CTA inside a What's-new card (2026-10-17): the card stays a
+   description, this is the labelled door. Amber = the Pro family. */
+.whatsnew-cta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.66rem;
+  color: #d4b35a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.whatsnew-cta:hover { color: #ffc107; }
+
+/* Camera ↔ keyboard mode switch (toolbar). Classic switch: icon · track+dot
+   · icon (2026-08-10 — two independently-clickable icon segments read as
+   two buttons and the box was too cramped to hold both comfortably; a
+   single button with a sliding dot is one control, one hit target, at
+   normal toolbar-icon size). The dot slides left (camera) / right
+   (keyboard); either icon dims when its mode isn't active. Fixed total
+   width so the centered toolbar never shifts between states. */
+.mode-switch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  height: 27px;
+  padding: 0 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  background: rgba(0, 255, 204, 0.05);
+  cursor: pointer;
+}
+.mode-switch-icon {
+  color: var(--text-muted);
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.mode-switch-icon.active { color: var(--neon-cyan); }
+.mode-switch-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+.mode-switch-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  box-shadow: 0 0 4px rgba(0, 255, 204, 0.6);
+  transition: transform 0.18s ease;
+}
+.mode-switch-dot.right { transform: translateX(12px); }
+
+.camera-error-message {
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.3);
+  border-radius: 12px;
+  padding: 0.8rem 1.5rem;
+  color: #ff6666;
+  font-size: 0.9rem;
+  max-width: 400px;
+}
+
+.camera-denied-hint {
+  color: #ff9999;
+  font-size: 0.85rem;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+.camera-placeholder.error-state {
+  background: radial-gradient(ellipse at center, rgba(255, 50, 50, 0.08) 0%, transparent 65%);
+}
+
+/* ─── Loading / Error Screens ────────────────────────────────────────── */
+
+/* Content (button / loading block) — natural size, centered with the
+   brand above it (original layout). */
+.camera-placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+@keyframes loading-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.loading-block {
+  animation: loading-fade-in 0.15s ease;
+  /* Compact centered block that REPLACES the Enable Camera spot (brand
+     stays above as the anchor). Toolbar/status remain visible — waiting
+     users can still open Help. Whitespace around the block is kept.
+     Material: dark solid panel (same family as the Help/record sheets —
+     the content-layer language), with a liquid-glass neon top edge. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  max-width: 340px;
+  padding: 16px 18px;
+  background: rgba(10, 10, 24, 0.85);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: var(--frost-shadow);
+  position: relative;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+/* Liquid-glass neon top edge (the "light catching the glass" line). */
+.loading-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14%;
+  right: 14%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, 0.45), transparent);
+}
+.loading-block.loading-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Static hairline divider framing the carousel zone. */
+.loading-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+/* Gesture carousel: natural height, centered. */
+.loading-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.loading-zone-label {
+  font-size: 0.56rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(160, 160, 208, 0.55);
+  font-family: var(--font-display);
+}
+.loading-demo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* No inner frame — the loading block itself is the frame. */
+}
+.loading-demo-name {
+  color: var(--neon-cyan);
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+.loading-demo-hint {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  margin-top: 1px;
+}
+/* Fixed hint slot — expectation text, swapped for the timeout
+   reassurance at 90s (same slot, height stays constant). */
+.loading-hint {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 340px;
+  font-size: 0.7rem !important;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(0, 255, 204, 0.2);
+  border-top-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-hint {
+  margin-top: 10px;
+  max-width: 320px;
+  text-align: center;
+  font-size: 0.72rem !important;
+  line-height: 1.5;
+}
+/* Loading progress: honest-anchored fake bar. Creeps to ~45% fast, then
+   crawls; jumps to 100% ONLY when the real download resolves (MediaPipe's
+   internal fetch exposes no byte progress, so the percent is approximate
+   but the completion anchor is real). */
+.loading-bar-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  /* overflow visible — hidden clipped the fill's neon glow */
+  overflow: visible;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.loading-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--neon-cyan), #7fd8ff);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.35);
+  transition: width 0.5s ease;
+}
+/* "Loading… 42%" label centered INSIDE the bar (mono digits = instrument
+   readout language). */
+.loading-bar-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.02em;
+}
+/* Visual permission guide: a mini address bar (CSS — the browser UI's own
+   language, so it reads as "the address bar"), lock icon (Feather/MIT),
+   and a three-step caption. Language-independent for non-technical users. */
+.err-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+/* Landscape phones are short (375px): the visual guide is the biggest
+   block — hide it there, and compress everything so brand + Retry fit on
+   one screen without scrolling. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .err-visual { display: none; }
+  .camera-placeholder.error-state {
+    /* Compressed content fits one screen → center the whole stack
+       (brand + message + guide + Retry) on the viewport center. */
+    justify-content: center;
+    padding-top: 0;
+    gap: 0.5rem;
+    overflow-y: auto;
+  }
+  .camera-placeholder.error-state .camera-placeholder-brand-text {
+    font-size: 1.1rem;
+  }
+  .camera-placeholder.error-state .camera-error-message {
+    font-size: 0.72rem;
+    padding: 0.5rem 0.9rem;
+  }
+  .camera-error-guide-item {
+    font-size: 0.66rem;
+    padding: 5px 10px;
+  }
+  .camera-placeholder.error-state .enable-camera-btn {
+    padding: 7px 18px;
+    font-size: 0.72rem;
+  }
+}
+/* Short screens (portrait too): scroll as a safety net. */
+@media (max-height: 560px) and (orientation: portrait) {
+  .camera-placeholder.error-state {
+    justify-content: flex-start;
+    padding-top: 8vh;
+    overflow-y: auto;
+  }
+}
+/* White space around the error content on mobile — the red guide boxes
+   used to touch the screen edges. */
+@media (max-width: 767px) {
+  .camera-placeholder.error-state {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+.err-addressbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 280px;
+  width: 100%;
+}
+.err-url {
+  flex: 1;
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.err-dots {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+.err-steps {
+  display: flex;
+  gap: 12px;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+.err-steps b {
+  color: var(--neon-cyan);
+}
+/* Full typographic hierarchy for the SEO content (headings were browser
+   defaults — h4 was the same size as body text, so the Troubleshooting
+   chapter read as one block). */
+.seo-content h2 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  margin: 2.2em 0 0.9em;
+  color: #f0f0ff;
+  letter-spacing: 0.02em;
+}
+.seo-content h3 {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  margin: 1.8em 0 0.6em;
+  color: #e0e0f8;
+}
+.seo-content h4 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin: 1.3em 0 0.4em;
+  color: #c8c8e8;
+}
+.seo-content p {
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+  margin: 0.4em 0 1em;
+}
+.seo-content ul {
+  margin: 0.4em 0 1em;
+  padding-left: 1.4em;
+}
+.seo-content ul li {
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+/* Hanging indent for the step lists: wrapped lines align under the text,
+   not under the number (the numbers used to stick out). */
+.seo-content ol {
+  padding-left: 1.4em;
+}
+.seo-content ol li {
+  text-indent: -1.4em;
+  padding-left: 1.4em;
+  margin-bottom: 3px;
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+.loading-cancel {
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 0.62rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+.loading-cancel:hover {
+  color: #e0e0f0;
+}
+
+.error-screen {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  max-width: 500px;
+}
+
+.error-message {
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.3);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  color: #ff6666;
+  font-size: 0.9rem;
+  text-align: center;
+  width: 100%;
+}
+
+.retry-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  padding: 0.6rem 1.5rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  border-color: var(--neon-cyan);
+}
+
+/* ─── Hand Tags ──────────────────────────────────────────────────────── */
+
+.hand-tag-overlay {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.hand-tag {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid;
+}
+
+.hand-tag.left { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.hand-tag.right { border-color: var(--neon-magenta); color: var(--neon-magenta); }
+
+/* ─── App Title ──────────────────────────────────────────────────────── */
+
+.app-title {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  z-index: 10;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+}
+
+/* ─── Liquid Glass Toolbar ──────────────────────────────────────────── */
+
+.frost-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--frost-bg);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-border);
+  border-radius: 20px;
+  box-shadow: var(--frost-shadow);
+  z-index: 20;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.frost-toolbar .brand {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  margin-right: 8px;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.frost-toolbar button,
+.frost-toolbar select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-body);
+  backdrop-filter: blur(4px);
+}
+
+.frost-toolbar button:hover,
+.frost-toolbar select:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.frost-toolbar button.active {
+  background: rgba(0, 255, 204, 0.12);
+  border-color: rgba(0, 255, 204, 0.3);
+  color: var(--neon-cyan);
+}
+
+.frost-toolbar button.icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.8rem;
+}
+
+/* Record button: a frosted capsule (pill) — the only non-round toolbar
+   button, so it stands out from every circle. Abstract by design: a red
+   dot inside (Apple Camera-app record language), no chrome/3D fill. */
+.frost-toolbar button.icon-btn.rec-capsule {
+  width: 50px;
+  height: 27px;
+  border-radius: 14px;
+  padding: 0 2px;
+  font-size: 0.72rem;
+}
+
+.frost-toolbar button.icon-btn.recording {
+  background: rgba(255, 60, 60, 0.15);
+  border-color: rgba(255, 60, 60, 0.4);
+  color: #ff4444;
+  animation: pulse-rec 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-rec {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 60, 60, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(255, 60, 60, 0.4); }
+}
+
+/* Custom inline tooltip */
+.frost-toolbar [data-tip] {
+  position: relative;
+}
+.frost-toolbar [data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 10px;
+  font-size: 0.6rem;
+  color: var(--text-primary);
+  background: rgba(22, 22, 32, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.frost-toolbar .divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0 4px;
+}
+
+/* Frosted settings panel */
+.frost-panel {
+  position: absolute;
+  /* 68px = toolbar bottom (~58px: top:12 + content) + 10px breathing
+     room. Was 56px and overlapped the toolbar's bottom edge by ~2px
+     (reported 2026-09-21). */
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px;
+  background: var(--frost-bg);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-border);
+  border-radius: 16px;
+  box-shadow: var(--frost-shadow);
+  /* Above .camera-placeholder (30): the brand wordmark used to cover the
+     panel's bottom toggle on the landing view (reported 2026-08-09). */
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 180px;
+  font-size: 0.65rem;
+}
+
+.frost-panel label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.frost-panel select {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+}
+
+/* ─── Floating Control Panel (legacy, kept for mobile) ───────────── */
+
+.floating-panel {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1rem;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 200px;
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.panel-label {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.timbre-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.timbre-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.timbre-btn:hover {
+  background: rgba(0, 255, 204, 0.08);
+  border-color: rgba(0, 255, 204, 0.2);
+}
+
+.timbre-btn.active {
+  background: rgba(0, 255, 204, 0.12);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.timbre-icon {
+  font-size: 0.9rem;
+}
+
+.timbre-text {
+  font-size: 0.65rem;
+}
+
+.loading-hint {
+  font-size: 0.6rem;
+  color: var(--neon-amber);
+  font-style: italic;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: rgba(120, 80, 255, 0.08);
+}
+
+.mode-btn.active {
+  background: rgba(120, 80, 255, 0.15);
+  border-color: var(--neon-purple);
+  color: var(--neon-purple);
+}
+
+.record-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(255, 50, 50, 0.08);
+  border: 1px solid rgba(255, 50, 50, 0.2);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: #ff5555;
+  transition: all 0.2s;
+}
+
+.record-btn:hover {
+  background: rgba(255, 50, 50, 0.15);
+}
+
+.record-btn.recording {
+  animation: pulse-record 1s ease-in-out infinite;
+}
+
+.record-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3333;
+}
+
+.record-btn.recording .record-dot {
+  animation: blink-dot 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 50, 50, 0.2); }
+  50% { box-shadow: 0 0 15px rgba(255, 50, 50, 0.4); }
+}
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ─── Mobile Panel ───────────────────────────────────────────────────── */
+
+.mobile-panel-toggle {
+  position: absolute;
+  bottom: 5rem;
+  right: 1rem;
+  z-index: 25;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-drawer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--glass-bg);
+  border-top: 1px solid var(--glass-border);
+  border-radius: 20px 20px 0 0;
+  backdrop-filter: blur(16px);
+  padding: 1rem;
+  animation: slide-up 0.3s ease;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.drawer-header button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ─── Bottom Status Bar ──────────────────────────────────────────────── */
+
+.status-bar-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  background: var(--frost-bg);
+  border-top: 1px solid var(--frost-border);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  padding: 0.6rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.status-chord {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--neon-cyan);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.status-roman {
+  font-size: 0.7rem;
+  color: var(--neon-magenta);
+  opacity: 0.8;
+}
+
+.status-volume {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  max-width: 200px;
+}
+
+.status-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-volume-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.status-volume-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+  border-radius: 3px;
+  transition: width 0.15s ease;
+}
+
+.status-timbre {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Stop Button ────────────────────────────────────────────────────── */
+
+.stop-btn-floating {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 50, 50, 0.15);
+  border: 1px solid rgba(255, 50, 50, 0.3);
+  border-radius: 20px;
+  color: #ff5555;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stop-btn-floating:hover {
+  background: rgba(255, 50, 50, 0.25);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────── */
+
+.desktop-only { display: flex; }
+.mobile-only { display: none; }
+
+@media (max-width: 768px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+
+  .camera-stage {
+    height: 100svh;
+  }
+
+  /* Toolbar: two rows — brand on top, controls wrap below */
+  .frost-toolbar {
+    gap: 2px;
+    padding: 4px 8px;
+    font-size: 0.55rem;
+    border-radius: 14px;
+    max-width: calc(100vw - 16px);
+    overflow-x: visible;
+    white-space: normal;
+    flex-wrap: wrap;
+    justify-content: center;
+    -webkit-overflow-scrolling: touch;
+  }
+  .frost-toolbar .brand {
+    flex-basis: 100%;
+    text-align: center;
+    font-size: 0.55rem;
+    margin-right: 0;
+    padding-bottom: 2px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .frost-toolbar button,
+  .frost-toolbar select {
+    font-size: 0.55rem;
+    padding: 3px 6px;
+    border-radius: 7px;
+    flex-shrink: 0;
+  }
+  .frost-toolbar button.icon-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.65rem;
+  }
+  .frost-toolbar button.icon-btn.rec-capsule {
+    width: 44px;
+    height: 23px;
+    border-radius: 12px;
+    font-size: 0.62rem;
+  }
+  .frost-toolbar .divider {
+    height: 12px;
+    margin: 0 1px;
+    flex-shrink: 0;
+  }
+  .frost-toolbar [data-tip]:hover::after {
+    display: none;
+  }
+
+  /* Settings panel: stack vertically */
+  .frost-panel {
+    flex-direction: column !important;
+    max-width: calc(100vw - 32px) !important;
+    padding: 12px !important;
+    gap: 10px !important;
+    font-size: 0.6rem !important;
+    border-radius: 12px;
+  }
+  .frost-panel > span.divider {
+    height: 1px !important;
+    width: 100% !important;
+    align-self: auto !important;
+  }
+
+  /* Scale guide: 2 rows × 4 in portrait (all 8 notes visible, no overflow) */
+  .scale-guide {
+    width: 201px !important; /* 4 × 48px + 3 × 3px gap */
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 3px 3px !important;
+    overflow: visible;
+  }
+  .scale-guide > div {
+    width: 48px !important;
+    min-width: 48px !important;
+    padding: 0.3rem 0.15rem !important;
+  }
+  .scale-guide > div > span:first-child {
+    font-size: 1rem !important;
+  }
+  .scale-guide > div > span:nth-child(2) {
+    font-size: 0.6rem !important;
+  }
+  .scale-guide > div > span:nth-child(3) {
+    display: none; /* hide hint text on mobile */
+  }
+
+  /* Status bar: single row, scrollable */
+  .status-bar-bottom {
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.65rem !important;
+    gap: 0.5rem !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none;
+    justify-content: flex-start !important;
+  }
+  .status-bar-bottom::-webkit-scrollbar { display: none; }
+  .status-bar-bottom > * {
+    flex-shrink: 0;
+  }
+
+  /* Camera placeholder */
+  .enable-camera-btn {
+    font-size: 1rem;
+    padding: 0.8rem 2rem;
+  }
+
+  .camera-placeholder-brand-text {
+    font-size: 1.4rem;
+  }
+}
+
+/* ─── Mobile Landscape ────────────────────────────────────────────────── */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .camera-stage {
+    height: 100svh;
+  }
+
+  /* Toolbar: single row in landscape (enough width) */
+  .frost-toolbar {
+    padding: 3px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .frost-toolbar::-webkit-scrollbar { display: none; }
+  .frost-toolbar .brand {
+    flex-basis: auto;
+    text-align: left;
+    font-size: 0.5rem;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+
+  .frost-panel {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+
+  /* Scale guide: wider spacing, single row in landscape */
+  .scale-guide {
+    bottom: 50px !important;
+    width: auto !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+  .scale-guide > div {
+    width: 52px !important;
+    min-width: 52px !important;
+    padding: 0.3rem 0.2rem !important;
+  }
+  .scale-guide > div > span:first-child {
+    font-size: 1.1rem !important;
+  }
+
+  .status-bar-bottom {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.6rem;
+    gap: 0.4rem;
+  }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.4);
+}
+
+::selection {
+  background: rgba(0, 255, 204, 0.25);
+  color: var(--text-primary);
+}
+
+/* ─── Onboarding: help-button pulse + hands-ready badge ─────────────── */
+
+/* One-time breathing glow on the ? button so first-time visitors notice
+   the hand demo exists — no popups, nothing blocking */
+/* ─── Visual atmosphere overlay (live view) ─────────────────────────────
+   Stage lighting over the camera canvas. Display layer only — the gesture
+   pipeline reads the raw video, never this. Opacity kept subtle: ≤15%
+   vignette, ≤4% scanlines (the recording window draws the same themes in
+   drawRecFrame — WYSIWYG). */
+.theme-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.theme-vignette {
+  /* base 1.0: 100% strength = fully black edges (deliberately "too much",
+     so users settle around 40-70%); 50% ≈ the old 100% look. */
+  background: radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 1) 100%);
+}
+.theme-scanlines {
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.3) 0 2px, transparent 2px 4px);
+}
+
+/* ─── Mobile ⋯ more panel (portrait phones) ────────────────────────────
+   Portrait phones collapse the toolbar to [brand · record · help · ⋯];
+   the rest lives in the ⋯ panel. Desktop and landscape keep the full
+   toolbar (see media query at the end of this block). */
+.mobile-more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: transparent;
+}
+.mobile-more-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 10px 12px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+/* ⋯ panel buttons — same frosted language as the toolbar buttons (the
+   toolbar styles are scoped to .frost-toolbar, so the panel needs its
+   own copies or it falls back to browser-default light buttons). */
+.mobile-more-panel button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-body);
+}
+.mobile-more-panel button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.mobile-more-panel button.active {
+  background: rgba(0, 255, 204, 0.12);
+  border-color: rgba(0, 255, 204, 0.3);
+  color: var(--neon-cyan);
+}
+.mobile-more-panel button.icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 767px) and (orientation: portrait) {
+  .mobile-collapse { display: none !important; }
+  /* Collapsed toolbar: brand + 3 buttons fit on ONE row (the old
+     two-row design had brand on flex-basis:100%; with only 4 elements
+     left there's no reason to keep the brand row). */
+  .frost-toolbar { flex-wrap: nowrap; }
+  .frost-toolbar .brand {
+    flex-basis: auto;
+    text-align: left;
+    margin-right: 6px;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+    font-size: 0.5rem;
+  }
+}
+@media (min-width: 768px), (orientation: landscape) {
+  .mobile-more-btn, .mobile-more-backdrop, .mobile-more-panel { display: none !important; }
+}
+
+@keyframes help-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 204, 0.35); border-color: rgba(0, 255, 204, 0.5); }
+  50%      { box-shadow: 0 0 16px rgba(0, 255, 204, 0.75); border-color: rgba(0, 255, 204, 0.9); }
+}
+.icon-btn.help-pulse, .mode-switch-toggle.help-pulse { animation: help-pulse 1.6s ease-in-out infinite; }
+
+.hands-ready-badge {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 8, 20, 0.88);
+  backdrop-filter: var(--frost-blur);
+  border: 1px solid rgba(0, 255, 204, 0.35);
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-size: 0.68rem;
+  color: #e0e0f4;
+  box-shadow: 0 0 24px rgba(0, 255, 204, 0.12), var(--frost-shadow);
+  z-index: 90;
+  animation: badge-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  white-space: nowrap;
+}
+@keyframes badge-pop {
+  from { opacity: 0; transform: translateX(-50%) scale(0.92); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* Help-panel hand demo: caption crossfade */
+.demo-step-text {
+  color: #d0d0e8;
+  animation: demo-step-in 0.4s ease;
+}
+@keyframes demo-step-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── B2: Recording UI ──────────────────────────────────────────────── */
+
+/* Countdown overlay — full screen, dimmed, big neon numbers */
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 15, 0.72);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 96;
+  pointer-events: none;
+}
+.countdown-hint {
+  color: #a0a0c8;
+  font-size: 0.85rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+.countdown-num {
+  font-family: var(--font-display);
+  font-size: clamp(6rem, 26vw, 10rem);
+  line-height: 1;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 34px rgba(0, 255, 204, 0.55);
+  animation: countdown-pop 1s ease-out forwards;
+}
+@keyframes countdown-pop {
+  0%   { transform: scale(2.6); opacity: 0; }
+  20%  { transform: scale(1.05); opacity: 1; }
+  75%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: scale(0.72); opacity: 0; }
+}
+/* Wrap-up 3-2-1 — magenta signals "stopping" (vs cyan "starting") */
+.countdown-num.wrap-up {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 34px rgba(255, 110, 199, 0.55);
+}
+
+/* Mode/ratio chooser + result sheet: bottom sheet on mobile, centered card on desktop.
+   Dark frosted glass (keeps text readable over the busy camera view) with the
+   app's liquid-glass border/shadow language. Floats above everything (z 95). */
+.rec-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(82vh, 660px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: rgba(10, 10, 24, 0.88);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid rgba(0, 255, 204, 0.15);
+  border-radius: 18px;
+  box-shadow: var(--frost-shadow), 0 0 24px rgba(0, 255, 204, 0.08);
+  padding: 14px 16px;
+  animation: rec-sheet-up 0.25s ease;
+  z-index: 95;
+}
+.rec-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+}
+@keyframes rec-sheet-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@media (min-width: 769px) {
+  .rec-sheet {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+  }
+  @keyframes rec-sheet-up {
+    from { opacity: 0; transform: translate(-50%, -42%); }
+    to   { opacity: 1; transform: translate(-50%, -50%); }
+  }
+}
+.rec-preview {
+  width: 100%;
+  /* Height-capped so a 9:16 portrait take can't blow up the panel past
+     its max-height (which hid the action buttons); object-fit contain
+     letterboxes the video inside the box, keeping the full frame. */
+  max-height: 42vh;
+  object-fit: contain;
+  border-radius: 10px;
+  margin-top: 10px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+/* History list present (2026-08-18): drop to 30vh so player + list fit
+   inside the 82vh sheet without scrolling - the old 42vh pushed the list
+   below the fold and it read as "gone". */
+.rec-preview--with-list {
+  max-height: 30vh;
+}
+
+.rec-sheet-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--neon-cyan);
+  margin-bottom: 4px;
+}
+.rec-sheet-sub {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  margin: 8px 0 6px;
+}
+
+/* Mode option cards with mini previews */
+.rec-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rec-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: #e0e0f0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rec-option:hover { background: rgba(255, 255, 255, 0.07); }
+.rec-option.active {
+  border-color: rgba(0, 255, 204, 0.55);
+  background: rgba(0, 255, 204, 0.08);
+}
+.rec-option.disabled { opacity: 0.45; cursor: not-allowed; }
+.rec-option .rec-preview {
+  width: 60px;
+  height: 34px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.rec-option strong { display: block; font-size: 0.78rem; }
+.rec-default-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 255, 204, 0.14);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  color: var(--neon-cyan);
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  vertical-align: 2px;
+}
+.rec-option em {
+  display: block;
+  font-style: normal;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Ratio segmented control */
+.rec-ratios {
+  display: flex;
+  gap: 8px;
+}
+.rec-ratio-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #d0d0e8;
+  cursor: pointer;
+}
+.rec-ratio-btn.active {
+  border-color: rgba(0, 255, 204, 0.55);
+  background: rgba(0, 255, 204, 0.1);
+  color: var(--neon-cyan);
+}
+.rec-ratio-hint {
+  font-size: 0.56rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+.rec-warn {
+  margin-top: 8px;
+  font-size: 0.6rem;
+  color: #ffb86c;
+}
+
+/* Pro-gate probe teaser (2026-08-10): advertises the Pro boundary without
+   gating anything — clicks are paid-intent analytics only. Amber = premium
+   (same as the 8vb badge), dashed border = "offered, not active". */
+.pro-teaser {
+  /* An <a> since 2026-10-17 (was a role=button div): block + no
+     underline so the outbound link keeps the old teaser look. */
+  display: block;
+  text-decoration: none;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border: 1px dashed rgba(255, 193, 7, 0.35);
+  border-radius: 6px;
+  color: #b0a26a;
+  font-size: 0.62rem;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.pro-teaser strong { color: #d4b35a; }
+.pro-teaser:hover,
+.pro-teaser:focus-visible {
+  border-color: rgba(255, 193, 7, 0.7);
+  color: #ffc107;
+  background: rgba(255, 193, 7, 0.06);
+  outline: none;
+}
+
+/* Action buttons */
+.rec-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.rec-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0f0;
+}
+.rec-btn.primary {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.22), rgba(255, 0, 255, 0.18));
+  border-color: rgba(0, 255, 204, 0.5);
+  color: var(--neon-cyan);
+}
+
+/* Capture-frame overlay: shows exactly what will be recorded */
+.rec-frame-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.rec-window {
+  position: absolute;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  border-radius: 6px;
+  /* Dim everything OUTSIDE the window (camera-viewfinder convention:
+     dark outside = not captured, inside stays full brightness so the
+     player keeps seeing their hands clearly). When the window equals the
+     full screen (full-frame recording) the shadow falls off-screen and
+     nothing dims — correct. */
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+}
+/* All ratios: the window is the recorded region mapped onto the screen,
+   per dimension (--rec-win-w/h from App.tsx — cover-fit of the video
+   into the ratio canvas ∩ the screen's cover-fit of the same video).
+   Portrait phone + portrait camera → full screen for 9:16, full-width
+   square for 1:1, full-width middle band for 16:9; landscape webcam on
+   a portrait screen → full screen everywhere (the recording contains
+   the whole visible view). Desktop 9:16 from a 4:3 webcam → 42% × 100%
+   (the 42%/32% strip math, preserved). */
+.rec-frame-overlay.ratio-1x1 .rec-window,
+.rec-frame-overlay.ratio-916 .rec-window,
+.rec-frame-overlay.ratio-169 .rec-window {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--rec-win-w, 100%);
+  height: var(--rec-win-h, 100%);
+}
+.rec-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: #ff4d6d;
+  background: rgba(5, 5, 15, 0.7);
+  border: 1px solid rgba(255, 77, 109, 0.5);
+  border-radius: 999px;
+  padding: 3px 10px;
+  animation: rec-blink 1.2s ease-in-out infinite;
+}
+@keyframes rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Mic toggle in the recording chooser */
+.rec-mic-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.68rem;
+  color: #d0d0e8;
+  cursor: pointer;
+  user-select: none;
+}
+.rec-mic-toggle input {
+  accent-color: var(--neon-cyan);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Mic device picker + recording mix slider */
+.rec-device-select {
+  width: 100%;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #e0e0f0;
+  font-size: 0.66rem;
+}
+.rec-device-select option { background: #12122a; }
+.rec-mix-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.64rem;
+  color: #d0d0e8;
+}
+.rec-mix-slider {
+  flex: 1;
+  accent-color: var(--neon-cyan);
+  cursor: pointer;
+}
+
+/* Liquid-glass mic level meter (bars rise with input) */
+.rec-mic-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 20px;
+  margin-top: 7px;
+  padding: 2px 3px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 255, 204, 0.12);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.rec-mic-meter span {
+  flex: 1;
+  background: linear-gradient(180deg, #00ffcc, #007a66);
+  border-radius: 2px 2px 0 0;
+  box-shadow: 0 0 5px rgba(0, 255, 204, 0.45);
+  transition: height 0.12s ease, opacity 0.2s ease;
+}
+
+/* Recording mix description + value */
+.rec-mix-desc {
+  font-size: 0.58rem;
+  color: #b0b0d0;
+  font-weight: 400;
+}
+.rec-mix-value {
+  font-size: 0.58rem;
+  color: var(--neon-cyan);
+  margin-top: 3px;
+}
+.rec-sheet-sub { margin: 7px 0 5px; }
+.rec-actions { flex-shrink: 0; margin-top: 12px; }
+
+/* Mic section — grayed out until enabled; prominent notice + enable button */
+.rec-mic-section.disabled {
+  opacity: 0.55;
+}
+.rec-mic-section.disabled .rec-mic-toggle {
+  cursor: not-allowed;
+}
+.rec-mic-notice {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 170, 0, 0.45);
+  background: rgba(255, 170, 0, 0.1);
+  border-radius: 9px;
+  font-size: 0.63rem;
+  color: #ffd28a;
+  line-height: 1.55;
+}
+.rec-mic-notice strong {
+  color: #ffaa00;
+}
+.rec-mic-enable-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 9px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 255, 204, 0.45);
+  background: rgba(0, 255, 204, 0.12);
+  color: var(--neon-cyan);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rec-mic-enable-btn:hover {
+  background: rgba(0, 255, 204, 0.22);
+}
+
+/* ─── Keyboard-mode guide overlay (first-run + replay) ────────────────
+   REAL physical keyboard layout (2026-08-09 user feedback): full QWERTY
+   rows so position recognition is instant, mapped keys glow by function
+   (cyan = harmony, pink = expression, red = stop), unmapped keys stay
+   dim, and the pressed key highlights live (window keydown/keyup).
+   Auto-dismisses after 8s; closes on click or Esc. */
+.kb-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(5, 5, 15, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  animation: kb-fade-in 0.25s ease;
+}
+
+@keyframes kb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kb-guide-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 14px rgba(0, 255, 204, 0.5);
+}
+
+/* Dismissal (no auto-hide, no key-press close; user decision 2026-08-09:
+   the first keypress is the lesson and must not dismiss it):
+   — .kb-guide-close-btn: explicit "Close" text button under the caption
+     (primary dismissal)
+   — .kb-guide-close: ✕ in the screen's top-right corner (standard
+     position; the explicit Close button frees it from needing to sit
+     by the keyboard, where it crowded the number row)
+   — overlay click + Esc as the third/fourth channel. */
+.kb-guide-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #c8c8e8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 1;
+}
+.kb-guide-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-color: rgba(0, 255, 204, 0.5);
+  box-shadow: 0 0 12px rgba(0, 255, 204, 0.25);
+}
+
+.kb-guide-close-btn {
+  padding: 7px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 255, 204, 0.45);
+  background: rgba(0, 255, 204, 0.08);
+  color: var(--neon-cyan);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.kb-guide-close-btn:hover {
+  background: rgba(0, 255, 204, 0.16);
+  border-color: rgba(0, 255, 204, 0.8);
+  box-shadow: 0 0 14px rgba(0, 255, 204, 0.3);
+}
+
+.kb-guide-sub {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: #9a9ac0;
+  margin-top: -10px;
+}
+
+/* The keyboard — one flex row per physical row. */
+.kb-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--frost-bg);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid var(--frost-border);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--frost-shadow);
+  max-width: min(720px, 92vw);
+}
+
+.kb-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.kb-key {
+  flex: 1 1 0;
+  min-width: 42px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 2px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 7px;
+  transition: all 0.12s ease;
+  cursor: pointer;
+}
+
+.kb-key-cap {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.kb-key-label {
+  font-size: 0.48rem;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+/* Accent groups — brand colors: harmony cyan, expression pink, stop red. */
+.kb-key-harmony {
+  background: rgba(0, 255, 204, 0.10);
+  border-color: rgba(0, 255, 204, 0.35);
+}
+.kb-key-harmony .kb-key-label { color: #6effe0; }
+
+.kb-key-expression {
+  background: rgba(255, 46, 158, 0.10);
+  border-color: rgba(255, 46, 158, 0.35);
+}
+.kb-key-expression .kb-key-label { color: #ff8ac4; }
+
+.kb-key-stop {
+  background: rgba(255, 80, 80, 0.10);
+  border-color: rgba(255, 80, 80, 0.35);
+}
+.kb-key-stop .kb-key-label { color: #ff9a9a; }
+
+/* Live pressed key — the press-to-learn highlight. */
+.kb-key-active {
+  transform: translateY(1px) scale(1.06);
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 22px rgba(0, 255, 204, 0.65), inset 0 0 12px rgba(0, 255, 204, 0.25);
+}
+.kb-key-active .kb-key-cap { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0, 255, 204, 0.9); }
+.kb-key-active .kb-key-label { color: var(--neon-cyan) !important; }
+
+/* Auto-demo highlight (distinct from the pressed state): white glow with
+   a soft scale pop, so the eye follows the teaching animation. */
+.kb-key-demo {
+  transform: translateY(1px) scale(1.08);
+  box-shadow: 0 0 26px rgba(255, 255, 255, 0.75), inset 0 0 14px rgba(0, 255, 204, 0.35);
+  border-color: #ffffff !important;
+}
+
+/* Demo caption line — the "Press 3 → III" teaching text. */
+.kb-guide-demo {
+  min-height: 1.5em;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 12px rgba(0, 255, 204, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.kb-guide-demo.visible {
+  opacity: 1;
+}
+
+.kb-guide-hint {
+  font-size: 0.62rem;
+  color: #b0b0d0;
+  letter-spacing: 0.06em;
+  text-align: center;
+  max-width: 560px;
+}
+
+/* ─── Local works gallery (2026-08-17, retention experiment) ──────────
+     Compact landing entry + height-capped modal (2026-08-18 redesign -
+     the original inline list and player pushed the page / status bar). */
+
+.works-entry {
+  margin-top: 14px;
+  width: min(380px, 88vw);
+  background: transparent;
+  border: 1px dashed rgba(120, 80, 255, 0.35);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.works-entry:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.15);
+}
+.works-entry-icon {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+.works-entry-new {
+  margin-left: 8px;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ff6ec7;
+  border: 1px solid rgba(255, 110, 199, 0.4);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: 1px;
+}
+
+/* Landing Pro entry (2026-10-17). Deliberately NOT the quiet dashed
+   line it started as: this is the shop window, so it reads as a real
+   button. It stays out of the START button's way by DIFFERENTIATION
+   rather than volume — solid gold fill vs cyan glass, sheen sweep vs
+   breathing glow — so the two never look like the same kind of action.
+   The in-app teasers (.pro-teaser) stay quiet: they interrupt a flow
+   already in progress. */
+.pro-entry {
+  position: relative;
+  /* flex so the arrow is a real flex item — it can never be orphaned
+     onto a line of its own when the label wraps on narrow screens. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  margin-top: 10px;
+  width: min(400px, 90vw);
+  background: linear-gradient(135deg, #ffc107 0%, #ff9f1a 55%, #ff8a00 100%);
+  border: 1px solid rgba(255, 214, 102, 0.9);
+  border-radius: 50px;
+  color: #2a1a00;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+  padding: 9px 16px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(255, 159, 26, 0.35), 0 2px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.pro-entry-label { flex: 1 1 auto; }
+.pro-entry strong {
+  color: #1a0f00;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.pro-entry:hover,
+.pro-entry:focus-visible {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 32px rgba(255, 179, 51, 0.6), 0 4px 14px rgba(0, 0, 0, 0.4);
+  outline: none;
+}
+.pro-entry-arrow {
+  display: inline-block;
+  margin-left: 5px;
+  font-weight: 800;
+  transition: transform 0.18s ease;
+}
+.pro-entry:hover .pro-entry-arrow { transform: translateX(4px); }
+
+/* Sheen: one highlight crossing the pill every few seconds. */
+.pro-entry-sheen {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-18deg);
+  animation: pro-sheen 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pro-sheen {
+  0%, 55% { left: -60%; }
+  100%    { left: 120%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pro-entry-sheen { animation: none; opacity: 0; }
+}
+
+/* Recordings overlay (2026-09-21): transparent click-catcher only — no
+   dim, no backdrop blur. Design target: same language as the settings
+   panel (background page stays normal, only the card is frosted). The
+   old full-viewport dim+blur was written for the toolbar-trapped mount
+   and only blurred a strip; once the mount was fixed it blurred the
+   whole screen (reported 2026-09-21). Outside-click + Esc still close. */
+.works-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+/* Recordings modal body: CONTENT layer (--panel-deep-bg + frost-blur),
+   same family as the rec-sheet — a text-heavy list over the live camera
+   view. Previously its own rgba literal; unified 2026-09-21. */
+.works-modal {
+  position: relative;
+  width: min(400px, 94vw);
+  max-height: 72vh;
+  overflow-y: auto;
+  background: var(--panel-deep-bg);
+  backdrop-filter: var(--frost-blur);
+  -webkit-backdrop-filter: var(--frost-blur);
+  border: 1px solid rgba(120, 80, 255, 0.35);
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align: left;
+  box-shadow: var(--frost-shadow);
+}
+.works-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.works-modal-title {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  letter-spacing: 0.08em;
+}
+.works-close {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.works-close:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.works-modal-sub {
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  letter-spacing: 0.04em;
+}
+.works-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.works-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(120, 80, 255, 0.06);
+  transition: background 0.15s ease;
+}
+.works-item:hover { background: rgba(120, 80, 255, 0.14); }
+.works-item.active { background: rgba(0, 255, 204, 0.1); border: 1px solid rgba(0, 255, 204, 0.25); }
+.works-item-icon { font-size: 0.9rem; }
+.works-item-meta {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+.works-item-date { font-family: var(--font-mono); }
+.works-item-dur { color: var(--text-muted); font-size: 0.64rem; }
+.works-item-actions { display: flex; gap: 4px; }
+.works-btn {
+  background: transparent;
+  border: 1px solid rgba(160, 160, 208, 0.25);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.works-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+}
+.works-player {
+  width: 100%;
+  max-height: 32vh;
+  object-fit: contain;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: #000;
+}
+.rec-previewing {
+  font-size: 0.62rem;
+  color: var(--neon-cyan);
+  margin-top: 6px;
+  letter-spacing: 0.03em;
+}
+.rec-works-title {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+}
+.rec-works-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 30vh; /* bounded: the mobile sheet must not run away */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rec-works-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(120, 80, 255, 0.06);
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+}
+.rec-works-item:hover { background: rgba(120, 80, 255, 0.14); }
+.rec-works-item.active { background: rgba(0, 255, 204, 0.1); border: 1px solid rgba(0, 255, 204, 0.25); }
+.rec-works-play {
+  background: transparent;
+  border: 1px solid rgba(160, 160, 208, 0.25);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  width: 24px;
+  height: 22px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rec-works-play:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.rec-works-icon { font-size: 0.8rem; }
+.rec-works-date { font-family: var(--font-mono); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec-works-dur { color: var(--text-muted); font-size: 0.6rem; }

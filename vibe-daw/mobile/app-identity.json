@@ -1,0 +1,15 @@
+{
+  "repo": "Vibe-DAW",
+  "name": "Vibe",
+  "slug": "vibe-daw",
+  "bundle": "org.vibedaw.app",
+  "domain": "vibedaw.org",
+  "entry": "/studio",
+  "scheme": "vibedaw",
+  "project": "2bed4eb6-60cb-45e2-a29f-466d8f72564f",
+  "background": "#050505",
+  "firebase": "vibe-daw",
+  "mic": true,
+  "ascAppId": "6825012825",
+  "googleIosClientId": "228687400506-eicj2b7l4o0khsnbf1e64bi1fgen85ji.apps.googleusercontent.com"
+}

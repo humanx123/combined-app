@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+ios/
+android/
+dist/
+.env*
+credentials.json
+simulator-build/
+xcodebuild.log
+simulator-app.zip

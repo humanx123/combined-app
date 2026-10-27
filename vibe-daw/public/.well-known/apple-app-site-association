@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "FRW37USW79.org.vibedaw.app",
+        "paths": [
+          "/studio/*",
+          "/studio"
+        ]
+      }
+    ]
+  }
+}

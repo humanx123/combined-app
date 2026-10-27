@@ -1,0 +1,32 @@
+{
+  "name": "combined-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Combined Gesture Synth Weld + Vibe DAW — agent-native gesture DAW",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "gesture-synth-app",
+    "vibe-daw"
+  ],
+  "scripts": {
+    "dev": "concurrently --names gesture,vibe --prefix \"[{name}]\" --prefix-colors cyan,magenta \"cd gesture-synth-app && npm run dev\" \"cd vibe-daw && npm run dev\" --kill-others-on-fail",
+    "build": "echo \"Use ./build.sh for production build\"",
+    "typecheck": "npm run typecheck:gesture && npm run typecheck:vibe",
+    "typecheck:gesture": "cd gesture-synth-app && npm run typecheck",
+    "typecheck:vibe": "cd vibe-daw && npm run typecheck",
+    "test": "npm run test:gesture && npm run test:vibe",
+    "test:gesture": "cd gesture-synth-app && npm test",
+    "test:vibe": "cd vibe-daw && npm test",
+    "install": "npm install -g concurrently lerna",
+    "lerna": "lerna"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "lerna": "^8.2.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

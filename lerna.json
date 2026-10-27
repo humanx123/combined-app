@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "npmClient": "npm",
+  "useWorkspaces": true,
+  "packages": [
+    "packages/*",
+    "gesture-synth-app",
+    "vibe-daw"
+  ],
+  "command": {
+    "publish": {
+      "allowBranch": "main",
+      "conventionalCommits": true,
+      "changelog": true
+    },
+    "bootstrap": {
+      "hoist": true,
+      "ignore": ["@types/*", "typescript", "vitest", "vite"]
+    }
+  }
+}
